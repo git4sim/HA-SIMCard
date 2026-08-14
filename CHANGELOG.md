@@ -2,6 +2,21 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.0.1]
+
+* **Fix**: editing a button/switch (`controls`) entry — name, entity, icon, color, actions —
+  silently did nothing whenever the "Windows" section was also expanded in the editor. Both
+  sections shared an unscoped element lookup, so the second one accidentally wired itself
+  into the first section's DOM. Deleting a window entry while both were open could also
+  incorrectly delete a control at the same time. Both are fixed by scoping each section's
+  editor logic to its own section.
+* **Card**: smaller window chips and tighter battery-gauge rows, so a room with 2 windows and
+  several battery gauges configured stays noticeably more compact.
+* **Editor**: color pickers (window/warning colors) now show a clear label above the swatch
+  instead of relying only on the text field's floating label.
+* **Docs**: README example config now uses made-up entity IDs/room instead of a real setup;
+  `preview.png` regenerated with fictional data to match.
+
 ## [1.0.0]
 
 Initial release of HA SimCard: a compact, conditional room-overview status card (own custom

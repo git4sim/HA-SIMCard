@@ -1,4 +1,4 @@
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -249,18 +249,18 @@ class HaSimCard extends HTMLElement {
         .subline { font-size: 12px; color: var(--secondary-text-color); display: flex; gap: 6px; flex-wrap: wrap; }
         .subline .clickable { cursor: pointer; }
         .subline .clickable:hover { text-decoration: underline; text-underline-offset: 2px; }
-        .stats { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
-        .stat-row { display: flex; align-items: center; gap: 5px; font-size: 10.5px; line-height: 1.3; color: var(--secondary-text-color); cursor: pointer; }
+        .stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+        .stat-row { display: flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.2; color: var(--secondary-text-color); cursor: pointer; }
         .stat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; opacity: 0.85; }
-        .stat-gauge { position: relative; width: 18px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; color: var(--stat-color, var(--secondary-text-color)); flex-shrink: 0; opacity: 0.9; }
-        .stat-gauge::after { content: ""; position: absolute; top: 50%; right: -3px; transform: translateY(-50%); width: 2px; height: 4px; background: currentColor; border-radius: 0 1px 1px 0; }
+        .stat-gauge { position: relative; width: 16px; height: 8px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; color: var(--stat-color, var(--secondary-text-color)); flex-shrink: 0; opacity: 0.9; }
+        .stat-gauge::after { content: ""; position: absolute; top: 50%; right: -3px; transform: translateY(-50%); width: 2px; height: 3.5px; background: currentColor; border-radius: 0 1px 1px 0; }
         .stat-fill { position: absolute; top: 1px; bottom: 1px; left: 1px; width: var(--fill, 0%); max-width: calc(100% - 2px); background: currentColor; border-radius: 1px; }
-        .stat-value { min-width: 26px; text-align: right; font-weight: 700; color: var(--val-color, var(--primary-text-color)); font-variant-numeric: tabular-nums; }
+        .stat-value { min-width: 24px; text-align: right; font-weight: 700; color: var(--val-color, var(--primary-text-color)); font-variant-numeric: tabular-nums; }
         .body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; max-height: 600px; opacity: 1; }
         .body.collapsed { max-height: 0 !important; opacity: 0; }
-        .windows { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
-        .win-chip { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
-        .win-chip ha-icon { --mdc-icon-size: 13px; color: var(--chip-color); }
+        .windows { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 14px 6px; }
+        .win-chip { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 7px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
+        .win-chip ha-icon { --mdc-icon-size: 12px; color: var(--chip-color); }
         .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
         .ctrl-btn { flex: 1 1 0; min-width: 78px; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctrl-btn:hover { background: rgba(128,128,128,0.14); }
@@ -648,8 +648,11 @@ class HaSimCardEditor extends HTMLElement {
   _colorFieldHTML(cls, label, value, def) {
     return `
       <div class="color-field ${cls}">
-        <ha-textfield class="color-text" label="${escAttr(label)}" placeholder="${escAttr(def)}" value="${escAttr(value)}" style="flex:1;"></ha-textfield>
-        <input type="color" class="color-swatch" value="${parseColorToPickerHex(value || def)}">
+        <label class="native-label">${escAttr(label)}</label>
+        <div class="color-row">
+          <input type="color" class="color-swatch" value="${parseColorToPickerHex(value || def)}">
+          <ha-textfield class="color-text" placeholder="${escAttr(def)}" value="${escAttr(value)}" style="flex:1;"></ha-textfield>
+        </div>
       </div>
     `;
   }
@@ -725,7 +728,9 @@ class HaSimCardEditor extends HTMLElement {
 
   _wireWindows(root, h, c) {
     const windows = Array.isArray(c.windows) ? c.windows : [];
-    const list = root.querySelector(".item-list");
+    // Scoped to this section only - other open sections (e.g. controls) have their own
+    // .item-list, and an unscoped lookup here would silently wire into their boxes instead.
+    const list = root.querySelector('[data-sec="windows"] .item-list');
     windows.forEach((w, idx) => {
       const box = list?.querySelector(`.item-box[data-idx="${idx}"]`);
       if (!box) return;
@@ -868,7 +873,12 @@ class HaSimCardEditor extends HTMLElement {
 
   _wireControls(root, h, c) {
     const controls = Array.isArray(c.controls) ? c.controls : [];
-    const list = root.querySelector(".item-list");
+    // Scoped to this section only - see comment in _wireWindows. Without this, opening
+    // "Windows" and "Buttons" at the same time made this grab the windows' .item-list
+    // (first in DOM order), so button edits (name, entity, icon, actions...) silently did
+    // nothing, and the delete button ended up wired twice - once correctly on the window
+    // entry, once more here against the wrong array.
+    const list = root.querySelector('[data-sec="controls"] .item-list');
     controls.forEach((ctrl, idx) => {
       const box = list?.querySelector(`.item-box[data-idx="${idx}"]`);
       if (!box) return;
@@ -970,8 +980,9 @@ class HaSimCardEditor extends HTMLElement {
         .native-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.75; margin-bottom: 4px; }
         .native-select { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 14px; border-radius: 4px; border: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); }
         .action-field { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
-        .color-field { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-        .color-swatch { width: 36px; height: 36px; border: 1px solid var(--divider-color); border-radius: 6px; padding: 0; cursor: pointer; flex-shrink: 0; }
+        .color-field { margin-bottom: 8px; }
+        .color-row { display: flex; gap: 8px; align-items: center; }
+        .color-swatch { width: 40px; height: 40px; border: 1px solid var(--divider-color); border-radius: 8px; padding: 3px; cursor: pointer; flex-shrink: 0; background: var(--card-background-color, var(--primary-background-color)); box-sizing: border-box; }
         .add-btn { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 8px; border: none; background: var(--primary-color, #ff9800); color: var(--text-primary-color, #fff); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
         .add-btn:disabled { opacity: 0.5; cursor: default; }
       </style>

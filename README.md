@@ -124,41 +124,46 @@ Every `tap_action` / `hold_action` / `double_tap_action` accepts:
 
 ```yaml
 type: custom:ha-simcard
-name: Schlafzimmer
-icon: mdi:bed
+name: Gästezimmer
+icon: mdi:home-outline
 collapsible: true
 
 windows:
-  - entity: binary_sensor.schlafzimmer_fenster_links
-    label: Fenster Links
-    battery_entity: sensor.schlafzimmer_fenster_links_battery
-  - entity: binary_sensor.schlafzimmer_fenster_rechts
-    label: Fenster Rechts
-    battery_entity: sensor.schlafzimmer_fenster_rechts_battery
+  - entity: binary_sensor.gaestezimmer_fenster_nord
+    label: Fenster Nord
+  - entity: binary_sensor.gaestezimmer_fenster_ost
+    label: Fenster Ost
+    battery_entity: sensor.gaestezimmer_fenster_ost_batterie
+    battery_label: Fensterbatterie Ost
 
 climate:
-  temperature_entity: sensor.schlafzimmer_hygrometer_temperatur
-  humidity_entity: sensor.schlafzimmer_hygrometer_luftfeuchtigkeit
-  battery_entity: sensor.schlafzimmer_hygrometer_battery
-  battery_label: Temperatursensor
+  temperature_entity: sensor.gaestezimmer_temperatur
+  humidity_entity: sensor.gaestezimmer_luftfeuchtigkeit
+  battery_entity: sensor.gaestezimmer_klimasensor_batterie
+  battery_label: Klimasensor
 
 switch_battery:
-  entity: sensor.schlafzimmer_schalter_battery
-  label: Lichtschalter
+  entity: sensor.gaestezimmer_schalter_batterie
+  label: Schalterbatterie
 
 controls:
-  - entity: light.schlafzimmer_decke
+  - entity: light.gaestezimmer_decke
     name: Decke
     tap_action: { action: toggle }
     hold_action: { action: more-info }
-  - entity: light.schlafzimmer_ecke
-    name: Ecke
-  - entity: light.schlafzimmer_tv
-    name: TV
+  - entity: light.gaestezimmer_bett
+    name: Bett
+  - entity: light.gaestezimmer_spiegel
+    name: Spiegel
+  - entity: light.gaestezimmer_kette
+    name: Kette
 
 battery_warning_threshold: 10
 battery_warning_color: "#f44336"
 ```
+
+> The entity IDs above are made up for illustration — swap in your own `binary_sensor` /
+> `sensor` / `light` (or `switch` / `fan` / `cover`) entities.
 
 ---
 
