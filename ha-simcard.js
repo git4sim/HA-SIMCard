@@ -74,6 +74,12 @@ function translateState(hass, state) {
 // =============================================================================
 const trimStr = (v) => (typeof v === "string" ? v.trim() : v);
 
+const escAttr = (v) => String(v ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/"/g, "&quot;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;");
+
 const clampPct = (n) => {
   const num = Number(n);
   return Number.isFinite(num) ? Math.max(0, Math.min(100, Math.round(num))) : null;
@@ -235,7 +241,7 @@ class HaSimCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card { overflow: hidden; }
-        .header { display: flex; align-items: flex-start; gap: 10px; padding: 14px 14px 10px; }
+        .header { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px; }
         .header.clickable { cursor: pointer; }
         .header ha-icon { --mdc-icon-size: 22px; color: var(--paper-item-icon-color, var(--state-icon-color, var(--primary-text-color))); margin-top: 1px; flex-shrink: 0; }
         .title-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -243,18 +249,18 @@ class HaSimCard extends HTMLElement {
         .subline { font-size: 12px; color: var(--secondary-text-color); display: flex; gap: 6px; flex-wrap: wrap; }
         .subline .clickable { cursor: pointer; }
         .subline .clickable:hover { text-decoration: underline; text-underline-offset: 2px; }
-        .stats { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-        .stat-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--secondary-text-color); cursor: pointer; }
-        .stat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; opacity: 0.85; }
-        .stat-gauge { position: relative; width: 20px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; color: var(--stat-color, var(--secondary-text-color)); flex-shrink: 0; opacity: 0.9; }
+        .stats { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+        .stat-row { display: flex; align-items: center; gap: 5px; font-size: 10.5px; line-height: 1.3; color: var(--secondary-text-color); cursor: pointer; }
+        .stat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; opacity: 0.85; }
+        .stat-gauge { position: relative; width: 18px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; box-sizing: border-box; color: var(--stat-color, var(--secondary-text-color)); flex-shrink: 0; opacity: 0.9; }
         .stat-gauge::after { content: ""; position: absolute; top: 50%; right: -3px; transform: translateY(-50%); width: 2px; height: 4px; background: currentColor; border-radius: 0 1px 1px 0; }
         .stat-fill { position: absolute; top: 1px; bottom: 1px; left: 1px; width: var(--fill, 0%); max-width: calc(100% - 2px); background: currentColor; border-radius: 1px; }
-        .stat-value { min-width: 28px; text-align: right; font-weight: 700; color: var(--val-color, var(--primary-text-color)); font-variant-numeric: tabular-nums; }
+        .stat-value { min-width: 26px; text-align: right; font-weight: 700; color: var(--val-color, var(--primary-text-color)); font-variant-numeric: tabular-nums; }
         .body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; max-height: 600px; opacity: 1; }
         .body.collapsed { max-height: 0 !important; opacity: 0; }
-        .windows { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
-        .win-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
-        .win-chip ha-icon { --mdc-icon-size: 15px; color: var(--chip-color); }
+        .windows { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 8px; }
+        .win-chip { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
+        .win-chip ha-icon { --mdc-icon-size: 13px; color: var(--chip-color); }
         .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
         .ctrl-btn { flex: 1 1 0; min-width: 78px; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctrl-btn:hover { background: rgba(128,128,128,0.14); }
@@ -480,13 +486,35 @@ class HaSimCard extends HTMLElement {
 // =============================================================================
 // EDITOR
 // =============================================================================
-const ACTION_TYPES = (h) => ([
-  { value: "more-info", label: getTranslation(h, "act_more") },
-  { value: "toggle", label: getTranslation(h, "act_toggle") },
-  { value: "navigate", label: getTranslation(h, "act_navigate") },
-  { value: "call-service", label: getTranslation(h, "act_call_service") },
-  { value: "none", label: getTranslation(h, "act_none") }
-]);
+const DELETE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 3v1H4v2h1v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6h1V4h-5V3H9zm2 6h2v9h-2V9zm-4 0h2v9H7V9zm8 0h2v9h-2V9z"/></svg>';
+const PLUS_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;vertical-align:-3px"><path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>';
+
+const ACTION_OPTIONS = [
+  { value: "more-info", key: "act_more" },
+  { value: "toggle", key: "act_toggle" },
+  { value: "navigate", key: "act_navigate" },
+  { value: "call-service", key: "act_call_service" },
+  { value: "none", key: "act_none" }
+];
+
+/**
+ * Renders an action-type <select> plus its conditional extra fields (navigation path /
+ * service+data), all present in the static markup and toggled via CSS display - so nothing
+ * needs to be created dynamically while the editor bundle may still be lazy-loading.
+ */
+function actionFieldHTML(h, cls, labelText, actionCfg) {
+  const act = actionCfg?.action || "none";
+  const opts = ACTION_OPTIONS.map((o) => `<option value="${o.value}"${act === o.value ? " selected" : ""}>${escAttr(getTranslation(h, o.key))}</option>`).join("");
+  return `
+    <div class="action-field ${cls}">
+      <label class="native-label">${escAttr(labelText)}</label>
+      <select class="native-select act-type">${opts}</select>
+      <ha-textfield class="act-nav" style="width:100%;margin-top:4px;display:${act === "navigate" ? "block" : "none"}" label="${escAttr(getTranslation(h, "nav_path"))}" value="${escAttr(actionCfg?.navigation_path)}"></ha-textfield>
+      <ha-textfield class="act-svc" style="width:100%;margin-top:4px;display:${act === "call-service" ? "block" : "none"}" label="${escAttr(getTranslation(h, "service"))}" value="${escAttr(actionCfg?.service)}"></ha-textfield>
+      <ha-textfield class="act-svcdata" multiline rows="2" style="width:100%;margin-top:4px;display:${act === "call-service" ? "block" : "none"}" label="${escAttr(getTranslation(h, "service_data"))}" value="${escAttr(actionCfg?.service_data ? JSON.stringify(actionCfg.service_data) : "")}"></ha-textfield>
+    </div>
+  `;
+}
 
 class HaSimCardEditor extends HTMLElement {
   constructor() {
@@ -496,7 +524,16 @@ class HaSimCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = config || {};
+    const incoming = config || {};
+    // Skip the destructive full rebuild when this is just the echo of a config we fired
+    // ourselves a moment ago - it would otherwise tear down whatever the user is mid-edit
+    // on every keystroke's blur. Only rebuild for genuinely external changes (first load,
+    // YAML edits elsewhere, etc).
+    if (this._rendered && this._lastFiredSig && JSON.stringify(incoming) === this._lastFiredSig) {
+      this._config = incoming;
+      return;
+    }
+    this._config = incoming;
     this._render();
   }
 
@@ -508,170 +545,408 @@ class HaSimCardEditor extends HTMLElement {
     }
     // Home Assistant assigns .hass very frequently (on every state change bus-wide).
     // Rebuilding the whole form on each tick would tear down any open ha-entity-picker
-    // dropdown mid-interaction (it closes the instant it opens). Only refresh the live
-    // hass reference on existing pickers/selectors instead of re-rendering the DOM.
-    this.shadowRoot?.querySelectorAll("ha-entity-picker, ha-selector, ha-icon-picker").forEach((el) => {
+    // dropdown mid-interaction. Only refresh the live hass reference on existing
+    // pickers/selectors instead of re-rendering the DOM.
+    this.shadowRoot?.querySelectorAll("ha-entity-picker, ha-icon-picker").forEach((el) => {
       el.hass = hass;
     });
   }
 
   get hass() { return this._hass; }
 
-  _fire(next) {
+  /**
+   * forceRerender: pass true whenever this change can reveal/hide OTHER fields (add/remove
+   * a list item, pick an entity that conditionally shows more fields below it, toggle a
+   * switch that reveals a dependent field) - those need the round-tripped setConfig() to
+   * actually rebuild the DOM. Leave it false (default) for plain text edits, where the
+   * field's own live value already reflects the change and rebuilding would only risk
+   * disrupting an in-progress edit for no benefit.
+   */
+  _fire(next, forceRerender = false) {
     this._config = next;
+    this._lastFiredSig = forceRerender ? null : JSON.stringify(next);
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true }));
   }
 
-  // ---- small reusable UI builders ----
+  // ---- action field wiring (shared by windows/climate/switch_battery/controls) ----
 
-  _textField(label, value, onChange, opts = {}) {
-    const f = document.createElement("ha-textfield");
-    f.label = label;
-    if (opts.placeholder) f.placeholder = opts.placeholder;
-    if (opts.type) f.type = opts.type;
-    f.value = value ?? "";
-    f.style.width = "100%";
-    f.addEventListener("change", (e) => { e.stopPropagation(); onChange(e.target.value); });
-    return f;
+  _wireActionField(root, cls, actionCfg, onChange) {
+    const field = root.querySelector(`.action-field.${cls}`);
+    if (!field) return;
+    const sel = field.querySelector(".act-type");
+    const navF = field.querySelector(".act-nav");
+    const svcF = field.querySelector(".act-svc");
+    const dataF = field.querySelector(".act-svcdata");
+    sel.addEventListener("change", (e) => {
+      e.stopPropagation();
+      const act = e.target.value;
+      if (navF) navF.style.display = act === "navigate" ? "" : "none";
+      if (svcF) svcF.style.display = act === "call-service" ? "" : "none";
+      if (dataF) dataF.style.display = act === "call-service" ? "" : "none";
+      onChange({ action: act });
+    });
+    if (navF) navF.addEventListener("change", (e) => { e.stopPropagation(); onChange({ action: "navigate", navigation_path: e.target.value }); });
+    if (svcF) svcF.addEventListener("change", (e) => { e.stopPropagation(); onChange({ action: "call-service", service: e.target.value, service_data: actionCfg?.service_data }); });
+    if (dataF) dataF.addEventListener("change", (e) => {
+      e.stopPropagation();
+      let data;
+      try { data = e.target.value ? JSON.parse(e.target.value) : undefined; } catch { data = undefined; }
+      onChange({ action: "call-service", service: actionCfg?.service || "", service_data: data });
+    });
   }
 
-  _entityPicker(label, value, onChange, domainFilter) {
-    const p = document.createElement("ha-entity-picker");
-    p.label = label;
-    p.value = value || "";
-    p.hass = this._hass;
-    if (domainFilter) p.includeDomains = domainFilter;
-    p.style.cssText = "width:100%;display:block;";
-    p.addEventListener("value-changed", (e) => { e.stopPropagation(); onChange(e.detail?.value ?? ""); });
-    return p;
+  _wireEntityPicker(root, selector, value, domains, onChange) {
+    const el = root.querySelector(selector);
+    if (!el) return;
+    el.hass = this._hass;
+    if (domains) el.includeDomains = domains;
+    el.value = value || "";
+    el.addEventListener("value-changed", (e) => { e.stopPropagation(); onChange(e.detail?.value ?? ""); });
   }
 
-  _iconPicker(value, onChange) {
-    const p = document.createElement("ha-icon-picker");
-    p.label = getTranslation(this._hass, "icon");
-    p.value = value || "";
-    p.style.cssText = "width:100%;display:block;";
-    p.addEventListener("value-changed", (e) => { e.stopPropagation(); onChange(e.detail?.value ?? ""); });
-    return p;
+  _wireIconPicker(root, selector, value, onChange) {
+    const el = root.querySelector(selector);
+    if (!el) return;
+    el.value = value || "";
+    el.addEventListener("value-changed", (e) => { e.stopPropagation(); onChange(e.detail?.value ?? ""); });
   }
 
-  _colorField(label, value, def, onChange) {
-    const wrap = document.createElement("div");
-    wrap.style.cssText = "display:flex; gap:8px; align-items:flex-end; margin-bottom:8px;";
-    const f = document.createElement("ha-textfield");
-    f.label = label;
-    f.placeholder = def;
-    f.value = value || "";
-    f.style.flex = "1";
-    const picker = document.createElement("input");
-    picker.type = "color";
-    picker.value = parseColorToPickerHex(value || def);
-    picker.style.cssText = "width:36px;height:36px;border:none;padding:0;cursor:pointer;flex-shrink:0;";
-    f.addEventListener("change", (e) => { e.stopPropagation(); onChange(e.target.value); picker.value = parseColorToPickerHex(e.target.value || def); });
-    picker.addEventListener("change", (e) => { e.stopPropagation(); onChange(e.target.value); f.value = e.target.value; });
-    wrap.appendChild(f);
-    wrap.appendChild(picker);
-    return wrap;
+  _wireTextField(root, selector, value, onChange) {
+    const el = root.querySelector(selector);
+    if (!el) return;
+    el.value = value ?? "";
+    el.addEventListener("change", (e) => { e.stopPropagation(); onChange(e.target.value); });
   }
 
-  _actionPair(container, actionCfg, onChange, includeDouble) {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex; gap:8px; margin-bottom:8px;";
-    row.appendChild(this._actionSelector(getTranslation(this._hass, "tap_action"), actionCfg.tap_action, "more-info", (v) => onChange({ ...actionCfg, tap_action: v })));
-    row.appendChild(this._actionSelector(getTranslation(this._hass, "hold_action"), actionCfg.hold_action, "none", (v) => onChange({ ...actionCfg, hold_action: v })));
-    container.appendChild(row);
-    if (includeDouble) {
-      const row2 = document.createElement("div");
-      row2.style.cssText = "display:flex; gap:8px; margin-bottom:8px;";
-      row2.appendChild(this._actionSelector(getTranslation(this._hass, "double_tap_action"), actionCfg.double_tap_action, "none", (v) => onChange({ ...actionCfg, double_tap_action: v })));
-      container.appendChild(row2);
+  _wireColorField(root, selector, value, def, onChange) {
+    const wrap = root.querySelector(selector);
+    if (!wrap) return;
+    const field = wrap.querySelector(".color-text");
+    const picker = wrap.querySelector(".color-swatch");
+    if (field) {
+      field.value = value || "";
+      field.addEventListener("change", (e) => {
+        e.stopPropagation();
+        const v = trimStr(e.target.value || "");
+        onChange(v);
+        if (picker) picker.value = parseColorToPickerHex(v || def);
+      });
+    }
+    if (picker) {
+      picker.value = parseColorToPickerHex(value || def);
+      picker.addEventListener("change", (e) => {
+        e.stopPropagation();
+        const hex = e.target.value;
+        onChange(hex);
+        if (field) field.value = hex;
+      });
     }
   }
 
-  _actionSelector(label, value, defaultAction, onChange) {
-    const wrap = document.createElement("div");
-    wrap.style.cssText = "flex:1; min-width:0;";
-    const sel = document.createElement("ha-selector");
-    sel.hass = this._hass;
-    sel.label = label;
-    sel.selector = { select: { mode: "dropdown", options: ACTION_TYPES(this._hass) } };
-    sel.value = value?.action || defaultAction;
-    wrap.appendChild(sel);
+  // ---- HTML builders ----
 
-    const extra = document.createElement("div");
-    extra.style.marginTop = "4px";
-    wrap.appendChild(extra);
+  _colorFieldHTML(cls, label, value, def) {
+    return `
+      <div class="color-field ${cls}">
+        <ha-textfield class="color-text" label="${escAttr(label)}" placeholder="${escAttr(def)}" value="${escAttr(value)}" style="flex:1;"></ha-textfield>
+        <input type="color" class="color-swatch" value="${parseColorToPickerHex(value || def)}">
+      </div>
+    `;
+  }
 
-    const renderExtra = (act, current) => {
-      extra.replaceChildren();
-      if (act === "navigate") {
-        const f = this._textField(getTranslation(this._hass, "nav_path"), current?.navigation_path, (v) => onChange({ action: "navigate", navigation_path: v }));
-        extra.appendChild(f);
-      } else if (act === "call-service") {
-        const sf = this._textField(getTranslation(this._hass, "service"), current?.service, (v) => onChange({ ...current, action: "call-service", service: v }));
-        extra.appendChild(sf);
-        const df = document.createElement("ha-textfield");
-        df.label = getTranslation(this._hass, "service_data");
-        df.placeholder = '{"key":"value"}';
-        df.multiline = true;
-        df.rows = 3;
-        df.value = current?.service_data ? JSON.stringify(current.service_data) : "";
-        df.style.cssText = "width:100%;margin-top:4px;";
-        df.addEventListener("change", (e) => {
-          e.stopPropagation();
-          let data;
-          try { data = e.target.value ? JSON.parse(e.target.value) : undefined; } catch { data = undefined; }
-          onChange({ ...current, action: "call-service", service: current?.service || "", service_data: data });
-        });
-        extra.appendChild(df);
+  _generalHTML(h, c) {
+    const collapsible = c.collapsible === true;
+    return `
+      <ha-textfield class="name-f" label="${escAttr(getTranslation(h, "name"))}" value="${escAttr(c.name)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+      <ha-icon-picker class="icon-f" label="${escAttr(getTranslation(h, "icon"))}" value="${escAttr(c.icon)}" style="width:100%;display:block;margin-bottom:8px;"></ha-icon-picker>
+      <ha-formfield label="${escAttr(getTranslation(h, "collapsible"))}">
+        <ha-switch class="collapsible-f"${collapsible ? " checked" : ""}></ha-switch>
+      </ha-formfield>
+      <div class="default-state-wrap" style="margin-top:8px;${collapsible ? "" : "display:none;"}">
+        <label class="native-label">${escAttr(getTranslation(h, "default_state"))}</label>
+        <select class="native-select default-state-f">
+          <option value="expanded"${c.default_state !== "collapsed" ? " selected" : ""}>${escAttr(getTranslation(h, "state_expanded"))}</option>
+          <option value="collapsed"${c.default_state === "collapsed" ? " selected" : ""}>${escAttr(getTranslation(h, "state_collapsed"))}</option>
+        </select>
+      </div>
+    `;
+  }
+
+  _wireGeneral(root, h, c) {
+    this._wireTextField(root, ".name-f", c.name, (v) => this._fire({ ...this._config, name: v }));
+    this._wireIconPicker(root, ".icon-f", c.icon, (v) => this._fire({ ...this._config, icon: v }));
+    const collapsibleSw = root.querySelector(".collapsible-f");
+    if (collapsibleSw) {
+      collapsibleSw.addEventListener("change", (e) => {
+        e.stopPropagation();
+        this._fire({ ...this._config, collapsible: e.target.checked }, true);
+      });
+    }
+    const stateSel = root.querySelector(".default-state-f");
+    if (stateSel) {
+      stateSel.addEventListener("change", (e) => {
+        e.stopPropagation();
+        this._fire({ ...this._config, default_state: e.target.value });
+      });
+    }
+  }
+
+  _windowItemHTML(h, w, idx) {
+    return `
+      <div class="item-box" data-idx="${idx}">
+        <div class="item-head">
+          <span class="item-title">${escAttr(w.entity) || `${escAttr(getTranslation(h, "windows"))} ${idx + 1}`}</span>
+          <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
+        </div>
+        <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "window_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-textfield class="win-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(w.label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${actionFieldHTML(h, "win-tap", getTranslation(h, "tap_action"), w.tap_action)}
+        ${actionFieldHTML(h, "win-hold", getTranslation(h, "hold_action"), w.hold_action)}
+        <ha-entity-picker class="win-batt-entity" label="${escAttr(getTranslation(h, "battery_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
+        ${w.battery_entity ? `
+          <ha-textfield class="win-batt-label" label="${escAttr(getTranslation(h, "battery_label"))}" value="${escAttr(w.battery_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+          ${actionFieldHTML(h, "win-batt-tap", getTranslation(h, "tap_action"), w.battery_tap_action)}
+          ${actionFieldHTML(h, "win-batt-hold", getTranslation(h, "hold_action"), w.battery_hold_action)}
+        ` : ""}
+      </div>
+    `;
+  }
+
+  _windowsHTML(h, c) {
+    const windows = Array.isArray(c.windows) ? c.windows : [];
+    const items = windows.map((w, i) => this._windowItemHTML(h, w, i)).join("");
+    const addDisabled = windows.length >= 2;
+    return `
+      <div class="item-list">${items}</div>
+      <button type="button" class="add-btn add-window-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "window_add"))}</button>
+      ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "window_max"))}</div>` : ""}
+    `;
+  }
+
+  _wireWindows(root, h, c) {
+    const windows = Array.isArray(c.windows) ? c.windows : [];
+    const list = root.querySelector(".item-list");
+    windows.forEach((w, idx) => {
+      const box = list?.querySelector(`.item-box[data-idx="${idx}"]`);
+      if (!box) return;
+      const upd = (patch, force = false) => {
+        const arr = [...(this._config?.windows || [])];
+        arr[idx] = { ...arr[idx], ...patch };
+        this._fire({ ...this._config, windows: arr }, force);
+      };
+      box.querySelector("[data-del]")?.addEventListener("click", () => {
+        const arr = [...(this._config?.windows || [])];
+        arr.splice(idx, 1);
+        const next = { ...this._config };
+        if (arr.length) next.windows = arr; else delete next.windows;
+        this._fire(next, true);
+      });
+      this._wireEntityPicker(box, ".win-entity", w.entity, ["binary_sensor", "sensor"], (v) => upd({ entity: v }, true));
+      this._wireTextField(box, ".win-label", w.label, (v) => upd({ label: v }));
+      this._wireActionField(box, "win-tap", w.tap_action, (v) => upd({ tap_action: v }));
+      this._wireActionField(box, "win-hold", w.hold_action, (v) => upd({ hold_action: v }));
+      this._wireEntityPicker(box, ".win-batt-entity", w.battery_entity, ["sensor"], (v) => upd({ battery_entity: v }, true));
+      if (w.battery_entity) {
+        this._wireTextField(box, ".win-batt-label", w.battery_label, (v) => upd({ battery_label: v }));
+        this._wireActionField(box, "win-batt-tap", w.battery_tap_action, (v) => upd({ battery_tap_action: v }));
+        this._wireActionField(box, "win-batt-hold", w.battery_hold_action, (v) => upd({ battery_hold_action: v }));
       }
-    };
-    renderExtra(sel.value, value);
-
-    sel.addEventListener("value-changed", (e) => {
-      e.stopPropagation();
-      const act = e.detail.value;
-      const next = { action: act };
-      onChange(next);
-      renderExtra(act, next);
     });
-    return wrap;
+    const addBtn = root.querySelector(".add-window-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", () => {
+        if (windows.length >= 2) return;
+        this._openSections.windows = true;
+        this._fire({ ...this._config, windows: [...windows, { entity: "" }] }, true);
+      });
+    }
   }
 
-  _section(id, titleKey, bodyBuilder) {
+  _climateHTML(h, c) {
+    const cl = c.climate || {};
+    return `
+      <ha-entity-picker class="cl-temp-entity" label="${escAttr(getTranslation(h, "temperature_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+      ${cl.temperature_entity ? `
+        <ha-textfield class="cl-temp-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(cl.temperature_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${actionFieldHTML(h, "cl-temp-tap", getTranslation(h, "tap_action"), cl.temperature_tap_action)}
+        ${actionFieldHTML(h, "cl-temp-hold", getTranslation(h, "hold_action"), cl.temperature_hold_action)}
+      ` : ""}
+      <ha-entity-picker class="cl-humid-entity" label="${escAttr(getTranslation(h, "humidity_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
+      ${cl.humidity_entity ? `
+        <ha-textfield class="cl-humid-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(cl.humidity_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${actionFieldHTML(h, "cl-humid-tap", getTranslation(h, "tap_action"), cl.humidity_tap_action)}
+        ${actionFieldHTML(h, "cl-humid-hold", getTranslation(h, "hold_action"), cl.humidity_hold_action)}
+      ` : ""}
+      <ha-entity-picker class="cl-batt-entity" label="${escAttr(getTranslation(h, "battery_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
+      ${cl.battery_entity ? `
+        <ha-textfield class="cl-batt-label" label="${escAttr(getTranslation(h, "battery_label"))}" value="${escAttr(cl.battery_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${actionFieldHTML(h, "cl-batt-tap", getTranslation(h, "tap_action"), cl.battery_tap_action)}
+        ${actionFieldHTML(h, "cl-batt-hold", getTranslation(h, "hold_action"), cl.battery_hold_action)}
+      ` : ""}
+    `;
+  }
+
+  _wireClimate(root, h, c) {
+    const cl = c.climate || {};
+    const upd = (patch, force = false) => this._fire({ ...this._config, climate: { ...(this._config?.climate || {}), ...patch } }, force);
+    this._wireEntityPicker(root, ".cl-temp-entity", cl.temperature_entity, ["sensor"], (v) => upd({ temperature_entity: v }, true));
+    if (cl.temperature_entity) {
+      this._wireTextField(root, ".cl-temp-label", cl.temperature_label, (v) => upd({ temperature_label: v }));
+      this._wireActionField(root, "cl-temp-tap", cl.temperature_tap_action, (v) => upd({ temperature_tap_action: v }));
+      this._wireActionField(root, "cl-temp-hold", cl.temperature_hold_action, (v) => upd({ temperature_hold_action: v }));
+    }
+    this._wireEntityPicker(root, ".cl-humid-entity", cl.humidity_entity, ["sensor"], (v) => upd({ humidity_entity: v }, true));
+    if (cl.humidity_entity) {
+      this._wireTextField(root, ".cl-humid-label", cl.humidity_label, (v) => upd({ humidity_label: v }));
+      this._wireActionField(root, "cl-humid-tap", cl.humidity_tap_action, (v) => upd({ humidity_tap_action: v }));
+      this._wireActionField(root, "cl-humid-hold", cl.humidity_hold_action, (v) => upd({ humidity_hold_action: v }));
+    }
+    this._wireEntityPicker(root, ".cl-batt-entity", cl.battery_entity, ["sensor"], (v) => upd({ battery_entity: v }, true));
+    if (cl.battery_entity) {
+      this._wireTextField(root, ".cl-batt-label", cl.battery_label, (v) => upd({ battery_label: v }));
+      this._wireActionField(root, "cl-batt-tap", cl.battery_tap_action, (v) => upd({ battery_tap_action: v }));
+      this._wireActionField(root, "cl-batt-hold", cl.battery_hold_action, (v) => upd({ battery_hold_action: v }));
+    }
+  }
+
+  _switchBatteryHTML(h, c) {
+    const sb = c.switch_battery || {};
+    return `
+      <ha-entity-picker class="sb-entity" label="${escAttr(getTranslation(h, "switch_battery_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+      ${sb.entity ? `
+        <ha-textfield class="sb-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(sb.label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${actionFieldHTML(h, "sb-tap", getTranslation(h, "tap_action"), sb.tap_action)}
+        ${actionFieldHTML(h, "sb-hold", getTranslation(h, "hold_action"), sb.hold_action)}
+      ` : ""}
+    `;
+  }
+
+  _wireSwitchBattery(root, h, c) {
+    const sb = c.switch_battery || {};
+    const upd = (patch, force = false) => this._fire({ ...this._config, switch_battery: { ...(this._config?.switch_battery || {}), ...patch } }, force);
+    this._wireEntityPicker(root, ".sb-entity", sb.entity, ["sensor"], (v) => upd({ entity: v }, true));
+    if (sb.entity) {
+      this._wireTextField(root, ".sb-label", sb.label, (v) => upd({ label: v }));
+      this._wireActionField(root, "sb-tap", sb.tap_action, (v) => upd({ tap_action: v }));
+      this._wireActionField(root, "sb-hold", sb.hold_action, (v) => upd({ hold_action: v }));
+    }
+  }
+
+  _controlItemHTML(h, ctrl, idx) {
+    return `
+      <div class="item-box" data-idx="${idx}">
+        <div class="item-head">
+          <span class="item-title">${escAttr(ctrl.name) || escAttr(ctrl.entity) || `${escAttr(getTranslation(h, "controls"))} ${idx + 1}`}</span>
+          <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
+        </div>
+        <ha-entity-picker class="ctrl-entity" label="${escAttr(getTranslation(h, "entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-textfield class="ctrl-name" label="${escAttr(getTranslation(h, "name"))}" value="${escAttr(ctrl.name)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        <div class="row2">
+          <ha-icon-picker class="ctrl-icon" label="${escAttr(getTranslation(h, "icon"))}" value="${escAttr(ctrl.icon)}"></ha-icon-picker>
+          ${this._colorFieldHTML("ctrl-on-color", getTranslation(h, "on_color"), ctrl.on_color, "#ffa726")}
+        </div>
+        <ha-formfield label="${escAttr(getTranslation(h, "show_icon"))}">
+          <ha-switch class="ctrl-show-icon"${ctrl.show_icon !== false ? " checked" : ""}></ha-switch>
+        </ha-formfield>
+        ${actionFieldHTML(h, "ctrl-tap", getTranslation(h, "tap_action"), ctrl.tap_action)}
+        ${actionFieldHTML(h, "ctrl-hold", getTranslation(h, "hold_action"), ctrl.hold_action)}
+        ${actionFieldHTML(h, "ctrl-dbl", getTranslation(h, "double_tap_action"), ctrl.double_tap_action)}
+      </div>
+    `;
+  }
+
+  _controlsHTML(h, c) {
+    const controls = Array.isArray(c.controls) ? c.controls : [];
+    const items = controls.map((ctrl, i) => this._controlItemHTML(h, ctrl, i)).join("");
+    const addDisabled = controls.length >= 4;
+    return `
+      <div class="item-list">${items}</div>
+      <button type="button" class="add-btn add-control-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "control_add"))}</button>
+      ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "control_max"))}</div>` : ""}
+    `;
+  }
+
+  _wireControls(root, h, c) {
+    const controls = Array.isArray(c.controls) ? c.controls : [];
+    const list = root.querySelector(".item-list");
+    controls.forEach((ctrl, idx) => {
+      const box = list?.querySelector(`.item-box[data-idx="${idx}"]`);
+      if (!box) return;
+      const upd = (patch, force = false) => {
+        const arr = [...(this._config?.controls || [])];
+        arr[idx] = { ...arr[idx], ...patch };
+        this._fire({ ...this._config, controls: arr }, force);
+      };
+      box.querySelector("[data-del]")?.addEventListener("click", () => {
+        const arr = [...(this._config?.controls || [])];
+        arr.splice(idx, 1);
+        const next = { ...this._config };
+        if (arr.length) next.controls = arr; else delete next.controls;
+        this._fire(next, true);
+      });
+      this._wireEntityPicker(box, ".ctrl-entity", ctrl.entity, ["light", "switch", "fan", "cover"], (v) => upd({ entity: v }, true));
+      this._wireTextField(box, ".ctrl-name", ctrl.name, (v) => upd({ name: v }));
+      this._wireIconPicker(box, ".ctrl-icon", ctrl.icon, (v) => upd({ icon: v }));
+      this._wireColorField(box, ".ctrl-on-color", ctrl.on_color, "#ffa726", (v) => upd({ on_color: v }));
+      const showIconSw = box.querySelector(".ctrl-show-icon");
+      if (showIconSw) showIconSw.addEventListener("change", (e) => { e.stopPropagation(); upd({ show_icon: e.target.checked }); });
+      this._wireActionField(box, "ctrl-tap", ctrl.tap_action, (v) => upd({ tap_action: v }));
+      this._wireActionField(box, "ctrl-hold", ctrl.hold_action, (v) => upd({ hold_action: v }));
+      this._wireActionField(box, "ctrl-dbl", ctrl.double_tap_action, (v) => upd({ double_tap_action: v }));
+    });
+    const addBtn = root.querySelector(".add-control-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", () => {
+        if (controls.length >= 4) return;
+        this._openSections.controls = true;
+        this._fire({ ...this._config, controls: [...controls, { entity: "", tap_action: { action: "toggle" }, hold_action: { action: "more-info" } }] }, true);
+      });
+    }
+  }
+
+  _appearanceHTML(h, c) {
+    return `
+      ${this._colorFieldHTML("app-open-color", getTranslation(h, "window_open_color"), c.window_open_color, "#FFA000")}
+      ${this._colorFieldHTML("app-closed-color", getTranslation(h, "window_closed_color"), c.window_closed_color, "#4CAF50")}
+      <ha-textfield class="app-threshold" type="number" label="${escAttr(getTranslation(h, "battery_warning_threshold"))}" value="${escAttr(c.battery_warning_threshold ?? "10")}" style="width:100%;display:block;margin:8px 0;"></ha-textfield>
+      ${this._colorFieldHTML("app-warn-color", getTranslation(h, "battery_warning_color"), c.battery_warning_color, "#f44336")}
+    `;
+  }
+
+  _wireAppearance(root, h, c) {
+    this._wireColorField(root, ".app-open-color", c.window_open_color, "#FFA000", (v) => this._fire({ ...this._config, window_open_color: v }));
+    this._wireColorField(root, ".app-closed-color", c.window_closed_color, "#4CAF50", (v) => this._fire({ ...this._config, window_closed_color: v }));
+    this._wireTextField(root, ".app-threshold", c.battery_warning_threshold ?? "10", (v) => {
+      const num = v === "" ? 10 : Number(v);
+      this._fire({ ...this._config, battery_warning_threshold: Number.isFinite(num) ? num : 10 });
+    });
+    this._wireColorField(root, ".app-warn-color", c.battery_warning_color, "#f44336", (v) => this._fire({ ...this._config, battery_warning_color: v }));
+  }
+
+  // ---- collapsible section shell ----
+
+  _sectionHTML(id, titleKey, bodyHTML) {
     const h = this._hass;
-    const sec = document.createElement("div");
-    sec.className = "sec";
-    const head = document.createElement("div");
-    head.className = "sec-head";
-    const title = document.createElement("span");
-    title.className = "sec-title";
-    title.textContent = getTranslation(h, titleKey);
-    const chev = document.createElement("ha-icon");
-    chev.icon = "mdi:chevron-right";
-    chev.className = "sec-chev";
-    head.appendChild(title);
-    head.appendChild(chev);
-    sec.appendChild(head);
-    const content = document.createElement("div");
-    content.className = "sec-content";
     const open = !!this._openSections[id];
-    sec.classList.toggle("open", open);
-    content.hidden = !open;
-    head.addEventListener("click", () => {
-      this._openSections[id] = !this._openSections[id];
-      this._render();
-    });
-    if (open) bodyBuilder(content);
-    sec.appendChild(content);
-    return sec;
+    return `
+      <div class="sec${open ? " open" : ""}" data-sec="${id}">
+        <div class="sec-head" data-sec-head="${id}">
+          <span class="sec-title">${escAttr(getTranslation(h, titleKey))}</span>
+          <ha-icon class="sec-chev" icon="mdi:chevron-right"></ha-icon>
+        </div>
+        <div class="sec-content"${open ? "" : " hidden"}>${open ? bodyHTML : ""}</div>
+      </div>
+    `;
   }
+
+  // ---- main render ----
 
   _render() {
     if (!this._hass) return;
     this._rendered = true;
     const h = this._hass;
     const c = this._config || {};
+
     this.shadowRoot.innerHTML = `
       <style>
         .wrap { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
@@ -681,214 +956,50 @@ class HaSimCardEditor extends HTMLElement {
         .sec-chev { --mdc-icon-size: 18px; opacity: 0.7; transition: transform 0.15s ease; }
         .sec.open .sec-chev { transform: rotate(90deg); }
         .sec-content { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .sec-content[hidden] { display: none; }
+        .item-list { display: flex; flex-direction: column; gap: 8px; }
         .item-box { border: 1px solid var(--divider-color); border-radius: 8px; padding: 10px; background: var(--card-background-color, var(--primary-background-color)); display: flex; flex-direction: column; gap: 8px; }
         .item-head { display: flex; align-items: center; justify-content: space-between; }
-        .item-title { font-size: 12px; font-weight: 600; opacity: 0.7; }
-        .del-btn { background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; color: #d32f2f; --mdc-icon-size: 18px; }
-        .row2 { display: flex; gap: 8px; }
-        .row2 > * { flex: 1; min-width: 0; }
-        .hint { font-size: 11px; opacity: 0.6; margin-top: -2px; }
+        .item-title { font-size: 12px; font-weight: 600; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .del-btn { background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; color: #d32f2f; }
+        .del-btn ha-icon, .del-btn svg { --mdc-icon-size: 18px; width: 18px; height: 18px; }
+        .row2 { display: flex; gap: 8px; align-items: flex-start; }
+        .row2 > ha-icon-picker { flex: 1; min-width: 0; }
+        .row2 > .color-field { flex: 1; min-width: 0; margin: 0; }
+        .hint { font-size: 11px; opacity: 0.6; }
+        .native-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.75; margin-bottom: 4px; }
+        .native-select { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 14px; border-radius: 4px; border: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); }
+        .action-field { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
+        .color-field { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .color-swatch { width: 36px; height: 36px; border: 1px solid var(--divider-color); border-radius: 6px; padding: 0; cursor: pointer; flex-shrink: 0; }
+        .add-btn { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 8px; border: none; background: var(--primary-color, #ff9800); color: var(--text-primary-color, #fff); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .add-btn:disabled { opacity: 0.5; cursor: default; }
       </style>
-      <div class="wrap" id="wrap"></div>
+      <div class="wrap">
+        ${this._sectionHTML("general", "general", this._generalHTML(h, c))}
+        ${this._sectionHTML("windows", "windows", this._windowsHTML(h, c))}
+        ${this._sectionHTML("climate", "climate", this._climateHTML(h, c))}
+        ${this._sectionHTML("switch_battery", "switch_battery", this._switchBatteryHTML(h, c))}
+        ${this._sectionHTML("controls", "controls", this._controlsHTML(h, c))}
+        ${this._sectionHTML("appearance", "appearance", this._appearanceHTML(h, c))}
+      </div>
     `;
-    const wrap = this.shadowRoot.getElementById("wrap");
 
-    // --- General ---
-    wrap.appendChild(this._section("general", "general", (content) => {
-      content.appendChild(this._textField(getTranslation(h, "name"), c.name, (v) => this._fire({ ...c, name: v })));
-      content.appendChild(this._iconPicker(c.icon, (v) => this._fire({ ...c, icon: v })));
-      const collapseRow = document.createElement("ha-formfield");
-      collapseRow.label = getTranslation(h, "collapsible");
-      const sw = document.createElement("ha-switch");
-      sw.checked = c.collapsible === true;
-      sw.addEventListener("change", (e) => { e.stopPropagation(); this._fire({ ...c, collapsible: e.target.checked }); });
-      collapseRow.appendChild(sw);
-      content.appendChild(collapseRow);
-      if (c.collapsible === true) {
-        const sel = document.createElement("ha-selector");
-        sel.hass = h;
-        sel.label = getTranslation(h, "default_state");
-        sel.selector = { select: { mode: "dropdown", options: [
-          { value: "expanded", label: getTranslation(h, "state_expanded") },
-          { value: "collapsed", label: getTranslation(h, "state_collapsed") }
-        ] } };
-        sel.value = c.default_state || "expanded";
-        sel.addEventListener("value-changed", (e) => { e.stopPropagation(); this._fire({ ...c, default_state: e.detail.value }); });
-        content.appendChild(sel);
-      }
-    }));
-
-    // --- Windows ---
-    wrap.appendChild(this._section("windows", "windows", (content) => {
-      const windows = Array.isArray(c.windows) ? c.windows : [];
-      windows.forEach((w, idx) => {
-        const box = document.createElement("div");
-        box.className = "item-box";
-        const head = document.createElement("div");
-        head.className = "item-head";
-        const t = document.createElement("span");
-        t.className = "item-title";
-        t.textContent = w.entity || `${getTranslation(h, "windows")} ${idx + 1}`;
-        const del = document.createElement("button");
-        del.className = "del-btn";
-        del.innerHTML = `<ha-icon icon="mdi:delete-outline"></ha-icon>`;
-        del.addEventListener("click", () => {
-          const arr = [...windows]; arr.splice(idx, 1);
-          const next = { ...c }; if (arr.length) next.windows = arr; else delete next.windows;
-          this._fire(next);
-        });
-        head.appendChild(t); head.appendChild(del);
-        box.appendChild(head);
-
-        const upd = (patch) => {
-          const arr = [...windows]; arr[idx] = { ...arr[idx], ...patch };
-          this._fire({ ...c, windows: arr });
-        };
-
-        box.appendChild(this._entityPicker(getTranslation(h, "window_entity"), w.entity, (v) => upd({ entity: v }), ["binary_sensor", "sensor"]));
-        box.appendChild(this._textField(getTranslation(h, "label"), w.label, (v) => upd({ label: v })));
-        this._actionPair(box, w, (v) => upd(v), false);
-
-        box.appendChild(this._entityPicker(getTranslation(h, "battery_entity"), w.battery_entity, (v) => upd({ battery_entity: v }), ["sensor"]));
-        if (w.battery_entity) {
-          box.appendChild(this._textField(getTranslation(h, "battery_label"), w.battery_label, (v) => upd({ battery_label: v })));
-          const battActions = { tap_action: w.battery_tap_action, hold_action: w.battery_hold_action };
-          this._actionPair(box, battActions, (v) => upd({ battery_tap_action: v.tap_action, battery_hold_action: v.hold_action }), false);
-        }
-        content.appendChild(box);
+    this.shadowRoot.querySelectorAll("[data-sec-head]").forEach((head) => {
+      head.addEventListener("click", () => {
+        const id = head.getAttribute("data-sec-head");
+        this._openSections[id] = !this._openSections[id];
+        this._render();
       });
-      const addBtn = document.createElement("mwc-button");
-      addBtn.raised = true;
-      addBtn.innerHTML = `<ha-icon icon="mdi:plus" slot="icon"></ha-icon>${getTranslation(h, "window_add")}`;
-      if (windows.length >= 2) {
-        addBtn.disabled = true;
-        const hint = document.createElement("div");
-        hint.className = "hint";
-        hint.textContent = getTranslation(h, "window_max");
-        content.appendChild(hint);
-      }
-      addBtn.addEventListener("click", () => {
-        if (windows.length >= 2) return;
-        this._openSections.windows = true;
-        this._fire({ ...c, windows: [...windows, { entity: "" }] });
-      });
-      content.appendChild(addBtn);
-    }));
+    });
 
-    // --- Climate sensor ---
-    wrap.appendChild(this._section("climate", "climate", (content) => {
-      const cl = c.climate || {};
-      const upd = (patch) => this._fire({ ...c, climate: { ...cl, ...patch } });
-
-      content.appendChild(this._entityPicker(getTranslation(h, "temperature_entity"), cl.temperature_entity, (v) => upd({ temperature_entity: v }), ["sensor"]));
-      if (cl.temperature_entity) {
-        content.appendChild(this._textField(getTranslation(h, "label"), cl.temperature_label, (v) => upd({ temperature_label: v })));
-        const tempActions = { tap_action: cl.temperature_tap_action, hold_action: cl.temperature_hold_action };
-        this._actionPair(content, tempActions, (v) => upd({ temperature_tap_action: v.tap_action, temperature_hold_action: v.hold_action }), false);
-      }
-
-      content.appendChild(this._entityPicker(getTranslation(h, "humidity_entity"), cl.humidity_entity, (v) => upd({ humidity_entity: v }), ["sensor"]));
-      if (cl.humidity_entity) {
-        content.appendChild(this._textField(getTranslation(h, "label"), cl.humidity_label, (v) => upd({ humidity_label: v })));
-        const humidActions = { tap_action: cl.humidity_tap_action, hold_action: cl.humidity_hold_action };
-        this._actionPair(content, humidActions, (v) => upd({ humidity_tap_action: v.tap_action, humidity_hold_action: v.hold_action }), false);
-      }
-
-      content.appendChild(this._entityPicker(getTranslation(h, "battery_entity"), cl.battery_entity, (v) => upd({ battery_entity: v }), ["sensor"]));
-      if (cl.battery_entity) {
-        content.appendChild(this._textField(getTranslation(h, "battery_label"), cl.battery_label, (v) => upd({ battery_label: v })));
-        const battActions = { tap_action: cl.battery_tap_action, hold_action: cl.battery_hold_action };
-        this._actionPair(content, battActions, (v) => upd({ battery_tap_action: v.tap_action, battery_hold_action: v.hold_action }), false);
-      }
-    }));
-
-    // --- Switch battery ---
-    wrap.appendChild(this._section("switch_battery", "switch_battery", (content) => {
-      const sb = c.switch_battery || {};
-      const upd = (patch) => this._fire({ ...c, switch_battery: { ...sb, ...patch } });
-      content.appendChild(this._entityPicker(getTranslation(h, "switch_battery_entity"), sb.entity, (v) => upd({ entity: v }), ["sensor"]));
-      if (sb.entity) {
-        content.appendChild(this._textField(getTranslation(h, "label"), sb.label, (v) => upd({ label: v })));
-        const actions = { tap_action: sb.tap_action, hold_action: sb.hold_action };
-        this._actionPair(content, actions, (v) => upd({ tap_action: v.tap_action, hold_action: v.hold_action }), false);
-      }
-    }));
-
-    // --- Controls ---
-    wrap.appendChild(this._section("controls", "controls", (content) => {
-      const controls = Array.isArray(c.controls) ? c.controls : [];
-      controls.forEach((ctrl, idx) => {
-        const box = document.createElement("div");
-        box.className = "item-box";
-        const head = document.createElement("div");
-        head.className = "item-head";
-        const t = document.createElement("span");
-        t.className = "item-title";
-        t.textContent = ctrl.name || ctrl.entity || `${getTranslation(h, "controls")} ${idx + 1}`;
-        const del = document.createElement("button");
-        del.className = "del-btn";
-        del.innerHTML = `<ha-icon icon="mdi:delete-outline"></ha-icon>`;
-        del.addEventListener("click", () => {
-          const arr = [...controls]; arr.splice(idx, 1);
-          const next = { ...c }; if (arr.length) next.controls = arr; else delete next.controls;
-          this._fire(next);
-        });
-        head.appendChild(t); head.appendChild(del);
-        box.appendChild(head);
-
-        const upd = (patch) => {
-          const arr = [...controls]; arr[idx] = { ...arr[idx], ...patch };
-          this._fire({ ...c, controls: arr });
-        };
-
-        box.appendChild(this._entityPicker(getTranslation(h, "entity"), ctrl.entity, (v) => upd({ entity: v }), ["light", "switch", "fan", "cover"]));
-        box.appendChild(this._textField(getTranslation(h, "name"), ctrl.name, (v) => upd({ name: v })));
-
-        const row2 = document.createElement("div");
-        row2.className = "row2";
-        row2.appendChild(this._iconPicker(ctrl.icon, (v) => upd({ icon: v })));
-        row2.appendChild(this._colorField(getTranslation(h, "on_color"), ctrl.on_color, "#ffa726", (v) => upd({ on_color: v })));
-        box.appendChild(row2);
-
-        const showIconField = document.createElement("ha-formfield");
-        showIconField.label = getTranslation(h, "show_icon");
-        const showIconSw = document.createElement("ha-switch");
-        showIconSw.checked = ctrl.show_icon !== false;
-        showIconSw.addEventListener("change", (e) => { e.stopPropagation(); upd({ show_icon: e.target.checked }); });
-        showIconField.appendChild(showIconSw);
-        box.appendChild(showIconField);
-
-        this._actionPair(box, ctrl, (v) => upd(v), true);
-        content.appendChild(box);
-      });
-      const addBtn = document.createElement("mwc-button");
-      addBtn.raised = true;
-      addBtn.innerHTML = `<ha-icon icon="mdi:plus" slot="icon"></ha-icon>${getTranslation(h, "control_add")}`;
-      if (controls.length >= 4) {
-        addBtn.disabled = true;
-        const hint = document.createElement("div");
-        hint.className = "hint";
-        hint.textContent = getTranslation(h, "control_max");
-        content.appendChild(hint);
-      }
-      addBtn.addEventListener("click", () => {
-        if (controls.length >= 4) return;
-        this._openSections.controls = true;
-        this._fire({ ...c, controls: [...controls, { entity: "", tap_action: { action: "toggle" }, hold_action: { action: "more-info" } }] });
-      });
-      content.appendChild(addBtn);
-    }));
-
-    // --- Appearance ---
-    wrap.appendChild(this._section("appearance", "appearance", (content) => {
-      content.appendChild(this._colorField(getTranslation(h, "window_open_color"), c.window_open_color, "#FFA000", (v) => this._fire({ ...c, window_open_color: v })));
-      content.appendChild(this._colorField(getTranslation(h, "window_closed_color"), c.window_closed_color, "#4CAF50", (v) => this._fire({ ...c, window_closed_color: v })));
-      content.appendChild(this._textField(getTranslation(h, "battery_warning_threshold"), c.battery_warning_threshold ?? "10", (v) => {
-        const num = v === "" ? 10 : Number(v);
-        this._fire({ ...c, battery_warning_threshold: Number.isFinite(num) ? num : 10 });
-      }, { type: "number" }));
-      content.appendChild(this._colorField(getTranslation(h, "battery_warning_color"), c.battery_warning_color, "#f44336", (v) => this._fire({ ...c, battery_warning_color: v })));
-    }));
+    const wrap = this.shadowRoot.querySelector(".wrap");
+    if (this._openSections.general) this._wireGeneral(wrap, h, c);
+    if (this._openSections.windows) this._wireWindows(wrap, h, c);
+    if (this._openSections.climate) this._wireClimate(wrap, h, c);
+    if (this._openSections.switch_battery) this._wireSwitchBattery(wrap, h, c);
+    if (this._openSections.controls) this._wireControls(wrap, h, c);
+    if (this._openSections.appearance) this._wireAppearance(wrap, h, c);
   }
 }
 

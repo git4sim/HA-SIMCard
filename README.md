@@ -124,38 +124,37 @@ Every `tap_action` / `hold_action` / `double_tap_action` accepts:
 
 ```yaml
 type: custom:ha-simcard
-name: Büro
-icon: mdi:chair-rolling
+name: Schlafzimmer
+icon: mdi:bed
 collapsible: true
 
 windows:
-  - entity: binary_sensor.buro_fenster_buro_links_tur
+  - entity: binary_sensor.schlafzimmer_fenster_links
     label: Fenster Links
-    battery_entity: sensor.buro_fenster_buro_links_tur_battery
-  - entity: binary_sensor.fenster_buro_rechts_tur
+    battery_entity: sensor.schlafzimmer_fenster_links_battery
+  - entity: binary_sensor.schlafzimmer_fenster_rechts
     label: Fenster Rechts
+    battery_entity: sensor.schlafzimmer_fenster_rechts_battery
 
 climate:
-  temperature_entity: sensor.buro_hygrometer_buro_temperatur
-  humidity_entity: sensor.buro_hygrometer_buro_luftfeuchtigkeit
-  battery_entity: sensor.buro_hygrometer_buro_battery
+  temperature_entity: sensor.schlafzimmer_hygrometer_temperatur
+  humidity_entity: sensor.schlafzimmer_hygrometer_luftfeuchtigkeit
+  battery_entity: sensor.schlafzimmer_hygrometer_battery
   battery_label: Temperatursensor
 
 switch_battery:
-  entity: sensor.buro_schalter_battery
+  entity: sensor.schlafzimmer_schalter_battery
   label: Lichtschalter
 
 controls:
-  - entity: light.buro_lampe_buro
+  - entity: light.schlafzimmer_decke
     name: Decke
     tap_action: { action: toggle }
     hold_action: { action: more-info }
-  - entity: light.burotisch_lampe
-    name: Tisch
-  - entity: light.buro_lampe_vitrine
-    name: Vitrine
-  - entity: light.untertisch_lightstrip
-    name: Lightstrip
+  - entity: light.schlafzimmer_ecke
+    name: Ecke
+  - entity: light.schlafzimmer_tv
+    name: TV
 
 battery_warning_threshold: 10
 battery_warning_color: "#f44336"
