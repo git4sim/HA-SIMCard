@@ -7,8 +7,9 @@
 ![Preview](preview.png)
 
 A compact, fully visually configurable **room overview card** for Home Assistant. Give it a
-room name/icon, and only the things you actually have in that room — windows, a
-temperature/humidity sensor, a switch battery, and up to 4 buttons — show up. Nothing else.
+room name/icon, and only the things you actually have in that room — windows, doors, smoke
+detectors, leak sensors, a temperature/humidity sensor, a switch battery, and up to 4 buttons
+— show up. Nothing else.
 
 > HA SimCard is an independent card, not an update to or dependency of any other room card —
 > install it alongside other Lovelace cards without conflicts (own custom element name,
@@ -25,15 +26,15 @@ temperature/humidity sensor, a switch battery, and up to 4 buttons — show up. 
 * **Stat gauges** (top-right, stacked) — small battery-style gauges for:
   * a **switch/remote battery** (e.g. a physical wall switch)
   * the **temperature/humidity sensor's battery**
-  * each **window sensor's battery** (if it has one)
+  * each **binary device's battery** (if it has one)
   Each gauge only appears if you've configured that entity — nothing is shown by default.
-* **Window chips** — one per configured sensor (1–3), colored by its on/off state. Each can be
-  set to a window, door, smoke detector, or leak sensor — own icon and state wording
-  (Open/Closed, Smoke/OK, Wet/Dry) for each.
+* **Binary device chips** — one per configured device (1–10). Each is a window, door, smoke
+  detector, or leak sensor — own icon, own state wording (Open/Closed, Smoke/OK, Wet/Dry),
+  and its own configurable on/off color pair per type.
 * **Buttons** — up to 4 freely definable switches (lights, switches, fans, covers like garage
   doors), showing name + state (and light brightness %, if applicable).
 
-Everything above is independently clickable: tap/hold actions are configurable per window,
+Everything above is independently clickable: tap/hold actions are configurable per device,
 per battery gauge, for temperature, for humidity, and for every button.
 
 **Bonus:** any battery gauge turns red (configurable) once it drops to/below a threshold
@@ -66,23 +67,25 @@ actually have that entity; anything left empty is simply not rendered on the car
 |---|---|---|
 | `name` | — | Room name |
 | `icon` | `mdi:home-outline` | Header icon |
-| `collapsible` | `false` | Click the header to collapse/expand windows + buttons |
+| `collapsible` | `false` | Click the header to collapse/expand devices + buttons |
 | `default_state` | `expanded` | `expanded` · `collapsed` (only relevant when `collapsible: true`) |
 | `remember_state` | `true` | Remember collapsed/expanded state across reloads |
-| `window_open_color` | `#FFA000` | Window chip color when open |
-| `window_closed_color` | `#4CAF50` | Window chip color when closed |
+| `window_open_color` / `window_closed_color` | `#FFA000` / `#4CAF50` | Chip color for `type: window` entries, open/closed |
+| `door_open_color` / `door_closed_color` | `#FFA000` / `#4CAF50` | Chip color for `type: door` entries, open/closed |
+| `smoke_open_color` / `smoke_closed_color` | `#f44336` / `#4CAF50` | Chip color for `type: smoke` entries, smoke/OK |
+| `leak_open_color` / `leak_closed_color` | `#f44336` / `#4CAF50` | Chip color for `type: leak` entries, wet/dry |
 | `battery_warning_threshold` | `10` | Battery gauges turn `battery_warning_color` at/below this % |
 | `battery_warning_color` | `#f44336` | Warning color for low battery gauges |
 
-### `windows` (list, 1–3 entries)
+### `windows` (list, 1–10 entries) — "Binary Devices" in the editor
 
 | Option | Default | Description |
 |---|---|---|
 | `entity` | — | `binary_sensor` (or `sensor`) — window/door contact, smoke detector, or leak sensor |
-| `type` | `window` | `window` · `door` · `smoke` · `leak` — switches the chip icon and its two state labels (Open/Closed, Smoke/OK, Wet/Dry) to match, and the fallback label if `label` is empty |
+| `type` | `window` | `window` · `door` · `smoke` · `leak` — switches the chip icon, its two state labels (Open/Closed, Smoke/OK, Wet/Dry), its color pair (see above), and the fallback label if `label` is empty |
 | `label` | — | Custom label (falls back to friendly name) |
-| `tap_action` / `hold_action` | — | Action on the window chip |
-| `battery_entity` | — | Optional battery sensor for this window — adds a stat gauge |
+| `tap_action` / `hold_action` | — | Action on the chip |
+| `battery_entity` | — | Optional battery sensor for this device — adds a stat gauge |
 | `battery_label` | — | Label for that gauge |
 | `battery_tap_action` / `battery_hold_action` | — | Action on that gauge |
 
@@ -138,6 +141,9 @@ windows:
     label: Fenster Ost
     battery_entity: sensor.gaestezimmer_fenster_ost_batterie
     battery_label: Fensterbatterie Ost
+  - entity: binary_sensor.gaestezimmer_rauchmelder
+    type: smoke
+    label: Rauchmelder
 
 climate:
   temperature_entity: sensor.gaestezimmer_temperatur
@@ -163,6 +169,8 @@ controls:
 
 battery_warning_threshold: 10
 battery_warning_color: "#f44336"
+smoke_open_color: "#f44336"
+smoke_closed_color: "#4CAF50"
 ```
 
 > The entity IDs above are made up for illustration — swap in your own `binary_sensor` /

@@ -2,6 +2,19 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.2.0]
+
+* **Per-type colors**: window/door/smoke/leak each get their own configurable open/closed
+  color pair (`window_open_color`/`window_closed_color`, `door_open_color`/
+  `door_closed_color`, `smoke_open_color`/`smoke_closed_color`, `leak_open_color`/
+  `leak_closed_color`) instead of one shared pair for all of them. All editable in the
+  Appearance section. `window_*` keeps its old meaning, so existing configs are unaffected.
+* **Renamed section**: the editor's "Windows" section (and its "Add"/"max" text) is now
+  "Binary Devices" ("Binärgeräte"), matching that it now covers windows, doors, smoke
+  detectors and leak sensors, not just windows. The `windows:` config key itself is
+  unchanged.
+* **Raised the limit** from 3 to 10 devices.
+
 ## [1.1.1]
 
 * **Windows**: the Window/Door type toggle now also has Smoke Detector and Leak Sensor

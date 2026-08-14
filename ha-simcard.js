@@ -1,4 +1,4 @@
-const VERSION = "1.1.1";
+const VERSION = "1.2.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -18,20 +18,19 @@ const TRANSLATIONS = {
     name: "Name", icon: "Icon", entity: "Entity", label: "Label (optional)",
     general: "General", collapsible: "Collapsible", default_state: "Default State",
     state_expanded: "Expanded", state_collapsed: "Collapsed",
-    windows: "Windows", window_add: "Add Window", window_entity: "Window Sensor",
+    windows: "Windows", binary_devices: "Binary Devices", device: "Device", device_add: "Add Device", device_max: "Maximum of 10 devices",
     window_type: "Type", type_window: "Window", type_door: "Door", type_smoke: "Smoke Detector", type_leak: "Leak Sensor",
     battery_entity: "Battery Sensor (optional)", battery_label: "Battery Label (optional)",
     climate: "Temperature / Humidity Sensor", temperature_entity: "Temperature Sensor",
     humidity_entity: "Humidity Sensor",
     switch_battery: "Switch Battery", switch_battery_entity: "Battery Sensor",
     controls: "Buttons / Switches", control_add: "Add Button", control_max: "Maximum of 4 buttons",
-    window_max: "Maximum of 3 windows",
-    appearance: "Appearance", on_color: "On Color", window_open_color: "Window Open Color", window_closed_color: "Window Closed Color",
+    appearance: "Appearance", on_color: "On Color",
     battery_warning_threshold: "Battery Warning Threshold (%)", battery_warning_color: "Battery Warning Color",
     tap_action: "Tap Action", hold_action: "Hold Action", double_tap_action: "Double Tap Action",
     act_more: "Details (Default)", act_toggle: "Toggle", act_navigate: "Navigate", act_call_service: "Action (service)", act_none: "None",
     nav_path: "Navigation Path", service: "Service (domain.service)", service_data: "Service Data (JSON)",
-    show_icon: "Show Icon", delete: "Delete", empty_hint: "Nothing configured yet — add a window, a sensor or a button below.",
+    show_icon: "Show Icon", delete: "Delete", empty_hint: "Nothing configured yet — add a device, a sensor or a button below.",
     state_on: "On", state_off: "Off", state_open: "Open", state_closed: "Closed", state_opening: "Opening", state_closing: "Closing",
     state_unavailable: "Unavailable", state_unknown: "Unknown",
     state_smoke: "Smoke", state_ok: "OK", state_wet: "Wet", state_dry: "Dry",
@@ -40,20 +39,19 @@ const TRANSLATIONS = {
     name: "Name", icon: "Icon", entity: "Entität", label: "Bezeichnung (optional)",
     general: "Allgemein", collapsible: "Einklappbar", default_state: "Standardzustand",
     state_expanded: "Ausgeklappt", state_collapsed: "Eingeklappt",
-    windows: "Fenster", window_add: "Fenster hinzufügen", window_entity: "Fenstersensor",
+    windows: "Fenster", binary_devices: "Binärgeräte", device: "Gerät", device_add: "Gerät hinzufügen", device_max: "Maximal 10 Geräte",
     window_type: "Typ", type_window: "Fenster", type_door: "Tür", type_smoke: "Rauchmelder", type_leak: "Leck-Sensor",
     battery_entity: "Batteriesensor (optional)", battery_label: "Batterie-Bezeichnung (optional)",
     climate: "Temperatur- / Feuchtigkeitssensor", temperature_entity: "Temperatursensor",
     humidity_entity: "Feuchtigkeitssensor",
     switch_battery: "Schalter-Batterie", switch_battery_entity: "Batteriesensor",
     controls: "Schalter / Buttons", control_add: "Button hinzufügen", control_max: "Maximal 4 Buttons",
-    window_max: "Maximal 3 Fenster",
-    appearance: "Darstellung", on_color: "Farbe (an)", window_open_color: "Farbe offen", window_closed_color: "Farbe geschlossen",
+    appearance: "Darstellung", on_color: "Farbe (an)",
     battery_warning_threshold: "Batteriewarnung Schwelle (%)", battery_warning_color: "Batteriewarnung Farbe",
     tap_action: "Antippen", hold_action: "Gedrückt halten", double_tap_action: "Doppelklick",
     act_more: "Details (Standard)", act_toggle: "Umschalten", act_navigate: "Navigieren", act_call_service: "Aktion (Service)", act_none: "Nichts",
     nav_path: "Navigationspfad", service: "Service (domain.service)", service_data: "Service-Daten (JSON)",
-    show_icon: "Icon anzeigen", delete: "Löschen", empty_hint: "Noch nichts konfiguriert — füge unten ein Fenster, einen Sensor oder einen Button hinzu.",
+    show_icon: "Icon anzeigen", delete: "Löschen", empty_hint: "Noch nichts konfiguriert — füge unten ein Gerät, einen Sensor oder einen Button hinzu.",
     state_on: "An", state_off: "Aus", state_open: "Offen", state_closed: "Zu", state_opening: "Öffnet", state_closing: "Schließt",
     state_unavailable: "Nicht verfügbar", state_unknown: "Unbekannt",
     state_smoke: "Rauch", state_ok: "OK", state_wet: "Nass", state_dry: "Trocken",
@@ -99,15 +97,19 @@ const isWindowOpen = (st) => OPEN_STATE_VALUES.has(String(st?.state || "").toLow
 /**
  * Per-"window" (really: binary_sensor chip) type. Same on/off state underneath for all of
  * them (device_class differs, but binary_sensor is always on/off) - only the icon pair, the
- * two state labels, and the fallback name (when no custom label/friendly_name) change.
+ * two state labels, the fallback name, and the pair of colors (each configurable, these are
+ * just the defaults) change. Colors are stored as top-level `${type}_open_color` /
+ * `${type}_closed_color` config keys - `window_open_color`/`window_closed_color` keep their
+ * original meaning for existing configs, door/smoke/leak are new.
  */
 const WINDOW_TYPES = {
-  window: { iconOpen: "mdi:window-open-variant", iconClosed: "mdi:window-closed-variant", labelKey: "type_window", openKey: "state_open", closedKey: "state_closed" },
-  door: { iconOpen: "mdi:door-open", iconClosed: "mdi:door-closed", labelKey: "type_door", openKey: "state_open", closedKey: "state_closed" },
-  smoke: { iconOpen: "mdi:smoke-detector-variant-alert", iconClosed: "mdi:smoke-detector-variant", labelKey: "type_smoke", openKey: "state_smoke", closedKey: "state_ok" },
-  leak: { iconOpen: "mdi:water-alert", iconClosed: "mdi:water-off", labelKey: "type_leak", openKey: "state_wet", closedKey: "state_dry" },
+  window: { iconOpen: "mdi:window-open-variant", iconClosed: "mdi:window-closed-variant", labelKey: "type_window", openKey: "state_open", closedKey: "state_closed", defaultOpenColor: "#FFA000", defaultClosedColor: "#4CAF50" },
+  door: { iconOpen: "mdi:door-open", iconClosed: "mdi:door-closed", labelKey: "type_door", openKey: "state_open", closedKey: "state_closed", defaultOpenColor: "#FFA000", defaultClosedColor: "#4CAF50" },
+  smoke: { iconOpen: "mdi:smoke-detector-variant-alert", iconClosed: "mdi:smoke-detector-variant", labelKey: "type_smoke", openKey: "state_smoke", closedKey: "state_ok", defaultOpenColor: "#f44336", defaultClosedColor: "#4CAF50" },
+  leak: { iconOpen: "mdi:water-alert", iconClosed: "mdi:water-off", labelKey: "type_leak", openKey: "state_wet", closedKey: "state_dry", defaultOpenColor: "#f44336", defaultClosedColor: "#4CAF50" },
 };
-const windowTypeOf = (w) => WINDOW_TYPES[w?.type] || WINDOW_TYPES.window;
+const resolvedWindowType = (w) => (WINDOW_TYPES[w?.type] ? w.type : "window");
+const MAX_BINARY_DEVICES = 10;
 
 function parseColorToPickerHex(color) {
   if (!color) return "#ff9800";
@@ -423,19 +425,20 @@ class HaSimCard extends HTMLElement {
 
     // --- Windows ---
     windowsEl.replaceChildren();
-    const openColor = trimStr(c.window_open_color) || "#FFA000";
-    const closedColor = trimStr(c.window_closed_color) || "#4CAF50";
     (c.windows || []).forEach((w) => {
       if (!w.entity) return;
       const st = h.states[w.entity];
       if (!st) return;
       const open = isWindowOpen(st);
+      const type = resolvedWindowType(w);
+      const typeCfg = WINDOW_TYPES[type];
+      const openColor = trimStr(c[`${type}_open_color`]) || typeCfg.defaultOpenColor;
+      const closedColor = trimStr(c[`${type}_closed_color`]) || typeCfg.defaultClosedColor;
       const color = open ? openColor : closedColor;
       const chip = document.createElement("div");
       chip.className = "win-chip";
       chip.style.setProperty("--chip-color", color);
       chip.style.setProperty("--chip-bg", hexToRgba(color.startsWith("#") ? color : "#888888", 0.15) || `${color}22`);
-      const typeCfg = windowTypeOf(w);
       const icon = document.createElement("ha-icon");
       icon.icon = open ? typeCfg.iconOpen : typeCfg.iconClosed;
       chip.appendChild(icon);
@@ -772,16 +775,16 @@ class HaSimCardEditor extends HTMLElement {
     return `
       <div class="item-box" data-idx="${idx}">
         <div class="item-head">
-          <span class="item-title">${escAttr(w.entity) || `${escAttr(getTranslation(h, "windows"))} ${idx + 1}`}</span>
+          <span class="item-title">${escAttr(w.entity) || `${escAttr(getTranslation(h, "device"))} ${idx + 1}`}</span>
           <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
         </div>
-        <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "window_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         ${segToggleHTML("win-type", getTranslation(h, "window_type"), [
           { value: "window", label: getTranslation(h, "type_window") },
           { value: "door", label: getTranslation(h, "type_door") },
           { value: "smoke", label: getTranslation(h, "type_smoke") },
           { value: "leak", label: getTranslation(h, "type_leak") }
-        ], WINDOW_TYPES[w.type] ? w.type : "window")}
+        ], resolvedWindowType(w))}
         ${textFieldHTML("win-label", getTranslation(h, "label"), w.label)}
         ${actionFieldHTML(h, "win-tap", getTranslation(h, "tap_action"), w.tap_action)}
         ${actionFieldHTML(h, "win-hold", getTranslation(h, "hold_action"), w.hold_action)}
@@ -798,11 +801,11 @@ class HaSimCardEditor extends HTMLElement {
   _windowsHTML(h, c) {
     const windows = Array.isArray(c.windows) ? c.windows : [];
     const items = windows.map((w, i) => this._windowItemHTML(h, w, i)).join("");
-    const addDisabled = windows.length >= 3;
+    const addDisabled = windows.length >= MAX_BINARY_DEVICES;
     return `
       <div class="item-list">${items}</div>
-      <button type="button" class="add-btn add-window-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "window_add"))}</button>
-      ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "window_max"))}</div>` : ""}
+      <button type="button" class="add-btn add-window-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "device_add"))}</button>
+      ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "device_max"))}</div>` : ""}
     `;
   }
 
@@ -841,7 +844,7 @@ class HaSimCardEditor extends HTMLElement {
     const addBtn = root.querySelector(".add-window-btn");
     if (addBtn) {
       addBtn.addEventListener("click", () => {
-        if (windows.length >= 3) return;
+        if (windows.length >= MAX_BINARY_DEVICES) return;
         this._openSections.windows = true;
         this._fire({ ...this._config, windows: [...windows, { entity: "" }] }, true);
       });
@@ -996,17 +999,23 @@ class HaSimCardEditor extends HTMLElement {
   }
 
   _appearanceHTML(h, c) {
+    const typeColors = Object.entries(WINDOW_TYPES).map(([type, cfg]) => `
+      <div class="native-label" style="opacity:0.9;margin-bottom:2px;">${escAttr(getTranslation(h, cfg.labelKey))}</div>
+      ${this._colorFieldHTML(`app-${type}-open-color`, getTranslation(h, cfg.openKey), c[`${type}_open_color`], cfg.defaultOpenColor)}
+      ${this._colorFieldHTML(`app-${type}-closed-color`, getTranslation(h, cfg.closedKey), c[`${type}_closed_color`], cfg.defaultClosedColor)}
+    `).join("");
     return `
-      ${this._colorFieldHTML("app-open-color", getTranslation(h, "window_open_color"), c.window_open_color, "#FFA000")}
-      ${this._colorFieldHTML("app-closed-color", getTranslation(h, "window_closed_color"), c.window_closed_color, "#4CAF50")}
+      ${typeColors}
       ${textFieldHTML("app-threshold", getTranslation(h, "battery_warning_threshold"), c.battery_warning_threshold ?? "10", { type: "number" })}
       ${this._colorFieldHTML("app-warn-color", getTranslation(h, "battery_warning_color"), c.battery_warning_color, "#f44336")}
     `;
   }
 
   _wireAppearance(root, h, c) {
-    this._wireColorField(root, ".app-open-color", c.window_open_color, "#FFA000", (v) => this._fire({ ...this._config, window_open_color: v }));
-    this._wireColorField(root, ".app-closed-color", c.window_closed_color, "#4CAF50", (v) => this._fire({ ...this._config, window_closed_color: v }));
+    Object.entries(WINDOW_TYPES).forEach(([type, cfg]) => {
+      this._wireColorField(root, `.app-${type}-open-color`, c[`${type}_open_color`], cfg.defaultOpenColor, (v) => this._fire({ ...this._config, [`${type}_open_color`]: v }));
+      this._wireColorField(root, `.app-${type}-closed-color`, c[`${type}_closed_color`], cfg.defaultClosedColor, (v) => this._fire({ ...this._config, [`${type}_closed_color`]: v }));
+    });
     this._wireTextField(root, ".app-threshold", c.battery_warning_threshold ?? "10", (v) => {
       const num = v === "" ? 10 : Number(v);
       this._fire({ ...this._config, battery_warning_threshold: Number.isFinite(num) ? num : 10 });
@@ -1075,7 +1084,7 @@ class HaSimCardEditor extends HTMLElement {
       </style>
       <div class="wrap">
         ${this._sectionHTML("general", "general", this._generalHTML(h, c))}
-        ${this._sectionHTML("windows", "windows", this._windowsHTML(h, c))}
+        ${this._sectionHTML("windows", "binary_devices", this._windowsHTML(h, c))}
         ${this._sectionHTML("climate", "climate", this._climateHTML(h, c))}
         ${this._sectionHTML("switch_battery", "switch_battery", this._switchBatteryHTML(h, c))}
         ${this._sectionHTML("controls", "controls", this._controlsHTML(h, c))}
