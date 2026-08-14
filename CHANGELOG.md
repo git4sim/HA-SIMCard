@@ -2,6 +2,12 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.1.1]
+
+* **Windows**: the Window/Door type toggle now also has Smoke Detector and Leak Sensor
+  options. Each type gets its own icon and its own pair of state labels (Open/Closed,
+  Smoke/OK, Wet/Dry) instead of always saying Open/Closed.
+
 ## [1.1.0]
 
 * **Windows**: each window now has a Window/Door toggle in the editor. Doors get their own

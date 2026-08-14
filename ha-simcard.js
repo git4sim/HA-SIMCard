@@ -1,4 +1,4 @@
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -19,7 +19,7 @@ const TRANSLATIONS = {
     general: "General", collapsible: "Collapsible", default_state: "Default State",
     state_expanded: "Expanded", state_collapsed: "Collapsed",
     windows: "Windows", window_add: "Add Window", window_entity: "Window Sensor",
-    window_type: "Type", type_window: "Window", type_door: "Door",
+    window_type: "Type", type_window: "Window", type_door: "Door", type_smoke: "Smoke Detector", type_leak: "Leak Sensor",
     battery_entity: "Battery Sensor (optional)", battery_label: "Battery Label (optional)",
     climate: "Temperature / Humidity Sensor", temperature_entity: "Temperature Sensor",
     humidity_entity: "Humidity Sensor",
@@ -34,13 +34,14 @@ const TRANSLATIONS = {
     show_icon: "Show Icon", delete: "Delete", empty_hint: "Nothing configured yet — add a window, a sensor or a button below.",
     state_on: "On", state_off: "Off", state_open: "Open", state_closed: "Closed", state_opening: "Opening", state_closing: "Closing",
     state_unavailable: "Unavailable", state_unknown: "Unknown",
+    state_smoke: "Smoke", state_ok: "OK", state_wet: "Wet", state_dry: "Dry",
   },
   de: {
     name: "Name", icon: "Icon", entity: "Entität", label: "Bezeichnung (optional)",
     general: "Allgemein", collapsible: "Einklappbar", default_state: "Standardzustand",
     state_expanded: "Ausgeklappt", state_collapsed: "Eingeklappt",
     windows: "Fenster", window_add: "Fenster hinzufügen", window_entity: "Fenstersensor",
-    window_type: "Typ", type_window: "Fenster", type_door: "Tür",
+    window_type: "Typ", type_window: "Fenster", type_door: "Tür", type_smoke: "Rauchmelder", type_leak: "Leck-Sensor",
     battery_entity: "Batteriesensor (optional)", battery_label: "Batterie-Bezeichnung (optional)",
     climate: "Temperatur- / Feuchtigkeitssensor", temperature_entity: "Temperatursensor",
     humidity_entity: "Feuchtigkeitssensor",
@@ -55,6 +56,7 @@ const TRANSLATIONS = {
     show_icon: "Icon anzeigen", delete: "Löschen", empty_hint: "Noch nichts konfiguriert — füge unten ein Fenster, einen Sensor oder einen Button hinzu.",
     state_on: "An", state_off: "Aus", state_open: "Offen", state_closed: "Zu", state_opening: "Öffnet", state_closing: "Schließt",
     state_unavailable: "Nicht verfügbar", state_unknown: "Unbekannt",
+    state_smoke: "Rauch", state_ok: "OK", state_wet: "Nass", state_dry: "Trocken",
   }
 };
 
@@ -93,6 +95,19 @@ const isUnavailable = (st) => !st || st.state === "unavailable" || st.state === 
 
 const OPEN_STATE_VALUES = new Set(["on", "open", "opening", "offen", "geöffnet", "gekippt"]);
 const isWindowOpen = (st) => OPEN_STATE_VALUES.has(String(st?.state || "").toLowerCase().trim());
+
+/**
+ * Per-"window" (really: binary_sensor chip) type. Same on/off state underneath for all of
+ * them (device_class differs, but binary_sensor is always on/off) - only the icon pair, the
+ * two state labels, and the fallback name (when no custom label/friendly_name) change.
+ */
+const WINDOW_TYPES = {
+  window: { iconOpen: "mdi:window-open-variant", iconClosed: "mdi:window-closed-variant", labelKey: "type_window", openKey: "state_open", closedKey: "state_closed" },
+  door: { iconOpen: "mdi:door-open", iconClosed: "mdi:door-closed", labelKey: "type_door", openKey: "state_open", closedKey: "state_closed" },
+  smoke: { iconOpen: "mdi:smoke-detector-variant-alert", iconClosed: "mdi:smoke-detector-variant", labelKey: "type_smoke", openKey: "state_smoke", closedKey: "state_ok" },
+  leak: { iconOpen: "mdi:water-alert", iconClosed: "mdi:water-off", labelKey: "type_leak", openKey: "state_wet", closedKey: "state_dry" },
+};
+const windowTypeOf = (w) => WINDOW_TYPES[w?.type] || WINDOW_TYPES.window;
 
 function parseColorToPickerHex(color) {
   if (!color) return "#ff9800";
@@ -420,14 +435,12 @@ class HaSimCard extends HTMLElement {
       chip.className = "win-chip";
       chip.style.setProperty("--chip-color", color);
       chip.style.setProperty("--chip-bg", hexToRgba(color.startsWith("#") ? color : "#888888", 0.15) || `${color}22`);
-      const isDoor = w.type === "door";
+      const typeCfg = windowTypeOf(w);
       const icon = document.createElement("ha-icon");
-      icon.icon = isDoor
-        ? (open ? "mdi:door-open" : "mdi:door-closed")
-        : (open ? "mdi:window-open-variant" : "mdi:window-closed-variant");
+      icon.icon = open ? typeCfg.iconOpen : typeCfg.iconClosed;
       chip.appendChild(icon);
-      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, isDoor ? "type_door" : "type_window");
-      const stateTxt = isUnavailable(st) ? getTranslation(h, "state_unavailable") : (open ? getTranslation(h, "state_open") : getTranslation(h, "state_closed"));
+      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, typeCfg.labelKey);
+      const stateTxt = isUnavailable(st) ? getTranslation(h, "state_unavailable") : getTranslation(h, open ? typeCfg.openKey : typeCfg.closedKey);
       chip.appendChild(document.createTextNode(`${label} · ${stateTxt}`));
       attachGestures(chip, h, { entity: w.entity, tap_action: w.tap_action, hold_action: w.hold_action });
       windowsEl.appendChild(chip);
@@ -765,8 +778,10 @@ class HaSimCardEditor extends HTMLElement {
         <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "window_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         ${segToggleHTML("win-type", getTranslation(h, "window_type"), [
           { value: "window", label: getTranslation(h, "type_window") },
-          { value: "door", label: getTranslation(h, "type_door") }
-        ], w.type === "door" ? "door" : "window")}
+          { value: "door", label: getTranslation(h, "type_door") },
+          { value: "smoke", label: getTranslation(h, "type_smoke") },
+          { value: "leak", label: getTranslation(h, "type_leak") }
+        ], WINDOW_TYPES[w.type] ? w.type : "window")}
         ${textFieldHTML("win-label", getTranslation(h, "label"), w.label)}
         ${actionFieldHTML(h, "win-tap", getTranslation(h, "tap_action"), w.tap_action)}
         ${actionFieldHTML(h, "win-hold", getTranslation(h, "hold_action"), w.hold_action)}
@@ -1048,10 +1063,9 @@ class HaSimCardEditor extends HTMLElement {
         .native-text:focus { outline: none; border-color: var(--primary-color, #ff9800); }
         textarea.native-text { resize: vertical; font-family: inherit; }
         .tf { margin-bottom: 8px; }
-        .seg-toggle { display: flex; border: 1px solid var(--divider-color); border-radius: 6px; overflow: hidden; }
-        .seg-btn { flex: 1; padding: 8px; border: none; border-left: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); font: inherit; font-size: 13px; cursor: pointer; opacity: 0.65; }
-        .seg-btn:first-child { border-left: none; }
-        .seg-btn.active { background: var(--primary-color, #ff9800); color: var(--text-primary-color, #fff); opacity: 1; font-weight: 600; }
+        .seg-toggle { display: flex; flex-wrap: wrap; gap: 6px; }
+        .seg-btn { flex: 1 1 calc(50% - 6px); min-width: 80px; padding: 8px 6px; border: 1px solid var(--divider-color); border-radius: 6px; background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); font: inherit; font-size: 12.5px; cursor: pointer; opacity: 0.65; text-align: center; }
+        .seg-btn.active { background: var(--primary-color, #ff9800); border-color: var(--primary-color, #ff9800); color: var(--text-primary-color, #fff); opacity: 1; font-weight: 600; }
         .action-field { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
         .color-field { margin-bottom: 8px; }
         .color-row { display: flex; gap: 8px; align-items: center; }

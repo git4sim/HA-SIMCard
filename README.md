@@ -27,8 +27,9 @@ temperature/humidity sensor, a switch battery, and up to 4 buttons — show up. 
   * the **temperature/humidity sensor's battery**
   * each **window sensor's battery** (if it has one)
   Each gauge only appears if you've configured that entity — nothing is shown by default.
-* **Window chips** — one per configured window (1–3), colored by open/closed state; each can
-  be set to a window or a door (own icon + fallback label).
+* **Window chips** — one per configured sensor (1–3), colored by its on/off state. Each can be
+  set to a window, door, smoke detector, or leak sensor — own icon and state wording
+  (Open/Closed, Smoke/OK, Wet/Dry) for each.
 * **Buttons** — up to 4 freely definable switches (lights, switches, fans, covers like garage
   doors), showing name + state (and light brightness %, if applicable).
 
@@ -77,8 +78,8 @@ actually have that entity; anything left empty is simply not rendered on the car
 
 | Option | Default | Description |
 |---|---|---|
-| `entity` | — | Window/door `binary_sensor` (or `sensor`) |
-| `type` | `window` | `window` · `door` — switches the chip icon (and the fallback label if `label` is empty) |
+| `entity` | — | `binary_sensor` (or `sensor`) — window/door contact, smoke detector, or leak sensor |
+| `type` | `window` | `window` · `door` · `smoke` · `leak` — switches the chip icon and its two state labels (Open/Closed, Smoke/OK, Wet/Dry) to match, and the fallback label if `label` is empty |
 | `label` | — | Custom label (falls back to friendly name) |
 | `tap_action` / `hold_action` | — | Action on the window chip |
 | `battery_entity` | — | Optional battery sensor for this window — adds a stat gauge |
