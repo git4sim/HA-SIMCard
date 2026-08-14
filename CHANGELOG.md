@@ -2,6 +2,19 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.0.2]
+
+* **Fix**: every free-text field in the editor (room name, window/battery labels, button
+  name, color hex value, battery threshold, navigation path / service fields) used
+  `ha-textfield`, whose internal outline/notch layout can fail to paint when the element is
+  created via a raw innerHTML string inside a collapsible/flex section — the field silently
+  stayed blank while still taking up its layout space, even though the value underneath was
+  set correctly. All of these are now plain, always-rendering `<input>`/`<textarea>` elements
+  with an explicit label above them.
+* **Card**: windows are now stacked one per row (full width) instead of wrapping side by
+  side, matching the compact-list look; each row stays small so 2 windows plus several
+  battery gauges don't add much height.
+
 ## [1.0.1]
 
 * **Fix**: editing a button/switch (`controls`) entry — name, entity, icon, color, actions —

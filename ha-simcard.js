@@ -1,4 +1,4 @@
-const VERSION = "1.0.1";
+const VERSION = "1.0.2";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -258,7 +258,7 @@ class HaSimCard extends HTMLElement {
         .stat-value { min-width: 24px; text-align: right; font-weight: 700; color: var(--val-color, var(--primary-text-color)); font-variant-numeric: tabular-nums; }
         .body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; max-height: 600px; opacity: 1; }
         .body.collapsed { max-height: 0 !important; opacity: 0; }
-        .windows { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 14px 6px; }
+        .windows { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 6px; }
         .win-chip { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 7px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
         .win-chip ha-icon { --mdc-icon-size: 12px; color: var(--chip-color); }
         .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
@@ -498,6 +498,23 @@ const ACTION_OPTIONS = [
 ];
 
 /**
+ * Labeled plain <input>, used for every free-text field in the editor (name, labels,
+ * thresholds, ...). Deliberately NOT ha-textfield: that component's internal outline/notch
+ * layout can fail to paint when it's created via a raw innerHTML string inside a
+ * collapsible/flex section like this editor's - the field silently renders blank while still
+ * taking up its layout space. A plain input always renders and needs no such lifecycle.
+ */
+function textFieldHTML(cls, label, value, opts = {}) {
+  const { type = "text", extraStyle = "" } = opts;
+  return `
+    <div class="tf" style="${extraStyle}">
+      <label class="native-label">${escAttr(label)}</label>
+      <input type="${escAttr(type)}" class="native-text ${cls}" value="${escAttr(value)}">
+    </div>
+  `;
+}
+
+/**
  * Renders an action-type <select> plus its conditional extra fields (navigation path /
  * service+data), all present in the static markup and toggled via CSS display - so nothing
  * needs to be created dynamically while the editor bundle may still be lazy-loading.
@@ -509,9 +526,18 @@ function actionFieldHTML(h, cls, labelText, actionCfg) {
     <div class="action-field ${cls}">
       <label class="native-label">${escAttr(labelText)}</label>
       <select class="native-select act-type">${opts}</select>
-      <ha-textfield class="act-nav" style="width:100%;margin-top:4px;display:${act === "navigate" ? "block" : "none"}" label="${escAttr(getTranslation(h, "nav_path"))}" value="${escAttr(actionCfg?.navigation_path)}"></ha-textfield>
-      <ha-textfield class="act-svc" style="width:100%;margin-top:4px;display:${act === "call-service" ? "block" : "none"}" label="${escAttr(getTranslation(h, "service"))}" value="${escAttr(actionCfg?.service)}"></ha-textfield>
-      <ha-textfield class="act-svcdata" multiline rows="2" style="width:100%;margin-top:4px;display:${act === "call-service" ? "block" : "none"}" label="${escAttr(getTranslation(h, "service_data"))}" value="${escAttr(actionCfg?.service_data ? JSON.stringify(actionCfg.service_data) : "")}"></ha-textfield>
+      <div class="tf act-nav-wrap" style="display:${act === "navigate" ? "block" : "none"}">
+        <label class="native-label">${escAttr(getTranslation(h, "nav_path"))}</label>
+        <input type="text" class="native-text act-nav" value="${escAttr(actionCfg?.navigation_path)}">
+      </div>
+      <div class="tf act-svc-wrap" style="display:${act === "call-service" ? "block" : "none"}">
+        <label class="native-label">${escAttr(getTranslation(h, "service"))}</label>
+        <input type="text" class="native-text act-svc" value="${escAttr(actionCfg?.service)}">
+      </div>
+      <div class="tf act-svcdata-wrap" style="display:${act === "call-service" ? "block" : "none"}">
+        <label class="native-label">${escAttr(getTranslation(h, "service_data"))}</label>
+        <textarea class="native-text act-svcdata" rows="2">${escAttr(actionCfg?.service_data ? JSON.stringify(actionCfg.service_data) : "")}</textarea>
+      </div>
     </div>
   `;
 }
@@ -574,15 +600,18 @@ class HaSimCardEditor extends HTMLElement {
     const field = root.querySelector(`.action-field.${cls}`);
     if (!field) return;
     const sel = field.querySelector(".act-type");
+    const navWrap = field.querySelector(".act-nav-wrap");
+    const svcWrap = field.querySelector(".act-svc-wrap");
+    const dataWrap = field.querySelector(".act-svcdata-wrap");
     const navF = field.querySelector(".act-nav");
     const svcF = field.querySelector(".act-svc");
     const dataF = field.querySelector(".act-svcdata");
     sel.addEventListener("change", (e) => {
       e.stopPropagation();
       const act = e.target.value;
-      if (navF) navF.style.display = act === "navigate" ? "" : "none";
-      if (svcF) svcF.style.display = act === "call-service" ? "" : "none";
-      if (dataF) dataF.style.display = act === "call-service" ? "" : "none";
+      if (navWrap) navWrap.style.display = act === "navigate" ? "block" : "none";
+      if (svcWrap) svcWrap.style.display = act === "call-service" ? "block" : "none";
+      if (dataWrap) dataWrap.style.display = act === "call-service" ? "block" : "none";
       onChange({ action: act });
     });
     if (navF) navF.addEventListener("change", (e) => { e.stopPropagation(); onChange({ action: "navigate", navigation_path: e.target.value }); });
@@ -651,7 +680,7 @@ class HaSimCardEditor extends HTMLElement {
         <label class="native-label">${escAttr(label)}</label>
         <div class="color-row">
           <input type="color" class="color-swatch" value="${parseColorToPickerHex(value || def)}">
-          <ha-textfield class="color-text" placeholder="${escAttr(def)}" value="${escAttr(value)}" style="flex:1;"></ha-textfield>
+          <input type="text" class="native-text color-text" placeholder="${escAttr(def)}" value="${escAttr(value)}">
         </div>
       </div>
     `;
@@ -660,7 +689,7 @@ class HaSimCardEditor extends HTMLElement {
   _generalHTML(h, c) {
     const collapsible = c.collapsible === true;
     return `
-      <ha-textfield class="name-f" label="${escAttr(getTranslation(h, "name"))}" value="${escAttr(c.name)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+      ${textFieldHTML("name-f", getTranslation(h, "name"), c.name)}
       <ha-icon-picker class="icon-f" label="${escAttr(getTranslation(h, "icon"))}" value="${escAttr(c.icon)}" style="width:100%;display:block;margin-bottom:8px;"></ha-icon-picker>
       <ha-formfield label="${escAttr(getTranslation(h, "collapsible"))}">
         <ha-switch class="collapsible-f"${collapsible ? " checked" : ""}></ha-switch>
@@ -702,12 +731,12 @@ class HaSimCardEditor extends HTMLElement {
           <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
         </div>
         <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "window_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
-        <ha-textfield class="win-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(w.label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("win-label", getTranslation(h, "label"), w.label)}
         ${actionFieldHTML(h, "win-tap", getTranslation(h, "tap_action"), w.tap_action)}
         ${actionFieldHTML(h, "win-hold", getTranslation(h, "hold_action"), w.hold_action)}
         <ha-entity-picker class="win-batt-entity" label="${escAttr(getTranslation(h, "battery_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
         ${w.battery_entity ? `
-          <ha-textfield class="win-batt-label" label="${escAttr(getTranslation(h, "battery_label"))}" value="${escAttr(w.battery_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+          ${textFieldHTML("win-batt-label", getTranslation(h, "battery_label"), w.battery_label)}
           ${actionFieldHTML(h, "win-batt-tap", getTranslation(h, "tap_action"), w.battery_tap_action)}
           ${actionFieldHTML(h, "win-batt-hold", getTranslation(h, "hold_action"), w.battery_hold_action)}
         ` : ""}
@@ -772,19 +801,19 @@ class HaSimCardEditor extends HTMLElement {
     return `
       <ha-entity-picker class="cl-temp-entity" label="${escAttr(getTranslation(h, "temperature_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
       ${cl.temperature_entity ? `
-        <ha-textfield class="cl-temp-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(cl.temperature_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("cl-temp-label", getTranslation(h, "label"), cl.temperature_label)}
         ${actionFieldHTML(h, "cl-temp-tap", getTranslation(h, "tap_action"), cl.temperature_tap_action)}
         ${actionFieldHTML(h, "cl-temp-hold", getTranslation(h, "hold_action"), cl.temperature_hold_action)}
       ` : ""}
       <ha-entity-picker class="cl-humid-entity" label="${escAttr(getTranslation(h, "humidity_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
       ${cl.humidity_entity ? `
-        <ha-textfield class="cl-humid-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(cl.humidity_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("cl-humid-label", getTranslation(h, "label"), cl.humidity_label)}
         ${actionFieldHTML(h, "cl-humid-tap", getTranslation(h, "tap_action"), cl.humidity_tap_action)}
         ${actionFieldHTML(h, "cl-humid-hold", getTranslation(h, "hold_action"), cl.humidity_hold_action)}
       ` : ""}
       <ha-entity-picker class="cl-batt-entity" label="${escAttr(getTranslation(h, "battery_entity"))}" style="width:100%;display:block;margin:8px 0;"></ha-entity-picker>
       ${cl.battery_entity ? `
-        <ha-textfield class="cl-batt-label" label="${escAttr(getTranslation(h, "battery_label"))}" value="${escAttr(cl.battery_label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("cl-batt-label", getTranslation(h, "battery_label"), cl.battery_label)}
         ${actionFieldHTML(h, "cl-batt-tap", getTranslation(h, "tap_action"), cl.battery_tap_action)}
         ${actionFieldHTML(h, "cl-batt-hold", getTranslation(h, "hold_action"), cl.battery_hold_action)}
       ` : ""}
@@ -819,7 +848,7 @@ class HaSimCardEditor extends HTMLElement {
     return `
       <ha-entity-picker class="sb-entity" label="${escAttr(getTranslation(h, "switch_battery_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
       ${sb.entity ? `
-        <ha-textfield class="sb-label" label="${escAttr(getTranslation(h, "label"))}" value="${escAttr(sb.label)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("sb-label", getTranslation(h, "label"), sb.label)}
         ${actionFieldHTML(h, "sb-tap", getTranslation(h, "tap_action"), sb.tap_action)}
         ${actionFieldHTML(h, "sb-hold", getTranslation(h, "hold_action"), sb.hold_action)}
       ` : ""}
@@ -845,7 +874,7 @@ class HaSimCardEditor extends HTMLElement {
           <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
         </div>
         <ha-entity-picker class="ctrl-entity" label="${escAttr(getTranslation(h, "entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
-        <ha-textfield class="ctrl-name" label="${escAttr(getTranslation(h, "name"))}" value="${escAttr(ctrl.name)}" style="width:100%;display:block;margin-bottom:8px;"></ha-textfield>
+        ${textFieldHTML("ctrl-name", getTranslation(h, "name"), ctrl.name)}
         <div class="row2">
           <ha-icon-picker class="ctrl-icon" label="${escAttr(getTranslation(h, "icon"))}" value="${escAttr(ctrl.icon)}"></ha-icon-picker>
           ${this._colorFieldHTML("ctrl-on-color", getTranslation(h, "on_color"), ctrl.on_color, "#ffa726")}
@@ -918,7 +947,7 @@ class HaSimCardEditor extends HTMLElement {
     return `
       ${this._colorFieldHTML("app-open-color", getTranslation(h, "window_open_color"), c.window_open_color, "#FFA000")}
       ${this._colorFieldHTML("app-closed-color", getTranslation(h, "window_closed_color"), c.window_closed_color, "#4CAF50")}
-      <ha-textfield class="app-threshold" type="number" label="${escAttr(getTranslation(h, "battery_warning_threshold"))}" value="${escAttr(c.battery_warning_threshold ?? "10")}" style="width:100%;display:block;margin:8px 0;"></ha-textfield>
+      ${textFieldHTML("app-threshold", getTranslation(h, "battery_warning_threshold"), c.battery_warning_threshold ?? "10", { type: "number" })}
       ${this._colorFieldHTML("app-warn-color", getTranslation(h, "battery_warning_color"), c.battery_warning_color, "#f44336")}
     `;
   }
@@ -978,7 +1007,10 @@ class HaSimCardEditor extends HTMLElement {
         .row2 > .color-field { flex: 1; min-width: 0; margin: 0; }
         .hint { font-size: 11px; opacity: 0.6; }
         .native-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.75; margin-bottom: 4px; }
-        .native-select { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 14px; border-radius: 4px; border: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); }
+        .native-select, .native-text { display: block; width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 14px; border-radius: 4px; border: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); }
+        .native-text:focus { outline: none; border-color: var(--primary-color, #ff9800); }
+        textarea.native-text { resize: vertical; font-family: inherit; }
+        .tf { margin-bottom: 8px; }
         .action-field { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
         .color-field { margin-bottom: 8px; }
         .color-row { display: flex; gap: 8px; align-items: center; }
