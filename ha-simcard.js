@@ -1,4 +1,4 @@
-const VERSION = "1.0.3";
+const VERSION = "1.1.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -19,6 +19,7 @@ const TRANSLATIONS = {
     general: "General", collapsible: "Collapsible", default_state: "Default State",
     state_expanded: "Expanded", state_collapsed: "Collapsed",
     windows: "Windows", window_add: "Add Window", window_entity: "Window Sensor",
+    window_type: "Type", type_window: "Window", type_door: "Door",
     battery_entity: "Battery Sensor (optional)", battery_label: "Battery Label (optional)",
     climate: "Temperature / Humidity Sensor", temperature_entity: "Temperature Sensor",
     humidity_entity: "Humidity Sensor",
@@ -39,6 +40,7 @@ const TRANSLATIONS = {
     general: "Allgemein", collapsible: "Einklappbar", default_state: "Standardzustand",
     state_expanded: "Ausgeklappt", state_collapsed: "Eingeklappt",
     windows: "Fenster", window_add: "Fenster hinzufügen", window_entity: "Fenstersensor",
+    window_type: "Typ", type_window: "Fenster", type_door: "Tür",
     battery_entity: "Batteriesensor (optional)", battery_label: "Batterie-Bezeichnung (optional)",
     climate: "Temperatur- / Feuchtigkeitssensor", temperature_entity: "Temperatursensor",
     humidity_entity: "Feuchtigkeitssensor",
@@ -418,10 +420,13 @@ class HaSimCard extends HTMLElement {
       chip.className = "win-chip";
       chip.style.setProperty("--chip-color", color);
       chip.style.setProperty("--chip-bg", hexToRgba(color.startsWith("#") ? color : "#888888", 0.15) || `${color}22`);
+      const isDoor = w.type === "door";
       const icon = document.createElement("ha-icon");
-      icon.icon = open ? "mdi:window-open-variant" : "mdi:window-closed-variant";
+      icon.icon = isDoor
+        ? (open ? "mdi:door-open" : "mdi:door-closed")
+        : (open ? "mdi:window-open-variant" : "mdi:window-closed-variant");
       chip.appendChild(icon);
-      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, "windows");
+      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, isDoor ? "type_door" : "type_window");
       const stateTxt = isUnavailable(st) ? getTranslation(h, "state_unavailable") : (open ? getTranslation(h, "state_open") : getTranslation(h, "state_closed"));
       chip.appendChild(document.createTextNode(`${label} · ${stateTxt}`));
       attachGestures(chip, h, { entity: w.entity, tap_action: w.tap_action, hold_action: w.hold_action });
@@ -510,6 +515,21 @@ function textFieldHTML(cls, label, value, opts = {}) {
     <div class="tf" style="${extraStyle}">
       <label class="native-label">${escAttr(label)}</label>
       <input type="${escAttr(type)}" class="native-text ${cls}" value="${escAttr(value)}">
+    </div>
+  `;
+}
+
+/**
+ * Labeled 2-4 option segmented button group (e.g. window vs. door). Plain buttons rather
+ * than a native <select> or ha-switch, so the two choices are always both visible at a
+ * glance instead of hidden behind a dropdown or an ambiguous on/off toggle.
+ */
+function segToggleHTML(cls, label, options, current) {
+  const btns = options.map((o) => `<button type="button" class="seg-btn${o.value === current ? " active" : ""}" data-value="${escAttr(o.value)}">${escAttr(o.label)}</button>`).join("");
+  return `
+    <div class="tf ${cls}-wrap">
+      <label class="native-label">${escAttr(label)}</label>
+      <div class="seg-toggle ${cls}">${btns}</div>
     </div>
   `;
 }
@@ -624,6 +644,18 @@ class HaSimCardEditor extends HTMLElement {
     });
   }
 
+  _wireSegToggle(root, selector, onChange) {
+    const wrap = root.querySelector(selector);
+    if (!wrap) return;
+    wrap.querySelectorAll(".seg-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        wrap.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        onChange(btn.getAttribute("data-value"));
+      });
+    });
+  }
+
   _wireEntityPicker(root, selector, value, domains, onChange) {
     const el = root.querySelector(selector);
     if (!el) return;
@@ -731,6 +763,10 @@ class HaSimCardEditor extends HTMLElement {
           <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
         </div>
         <ha-entity-picker class="win-entity" label="${escAttr(getTranslation(h, "window_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        ${segToggleHTML("win-type", getTranslation(h, "window_type"), [
+          { value: "window", label: getTranslation(h, "type_window") },
+          { value: "door", label: getTranslation(h, "type_door") }
+        ], w.type === "door" ? "door" : "window")}
         ${textFieldHTML("win-label", getTranslation(h, "label"), w.label)}
         ${actionFieldHTML(h, "win-tap", getTranslation(h, "tap_action"), w.tap_action)}
         ${actionFieldHTML(h, "win-hold", getTranslation(h, "hold_action"), w.hold_action)}
@@ -776,6 +812,7 @@ class HaSimCardEditor extends HTMLElement {
         this._fire(next, true);
       });
       this._wireEntityPicker(box, ".win-entity", w.entity, ["binary_sensor", "sensor"], (v) => upd({ entity: v }, true));
+      this._wireSegToggle(box, ".win-type", (v) => upd({ type: v }));
       this._wireTextField(box, ".win-label", w.label, (v) => upd({ label: v }));
       this._wireActionField(box, "win-tap", w.tap_action, (v) => upd({ tap_action: v }));
       this._wireActionField(box, "win-hold", w.hold_action, (v) => upd({ hold_action: v }));
@@ -1011,6 +1048,10 @@ class HaSimCardEditor extends HTMLElement {
         .native-text:focus { outline: none; border-color: var(--primary-color, #ff9800); }
         textarea.native-text { resize: vertical; font-family: inherit; }
         .tf { margin-bottom: 8px; }
+        .seg-toggle { display: flex; border: 1px solid var(--divider-color); border-radius: 6px; overflow: hidden; }
+        .seg-btn { flex: 1; padding: 8px; border: none; border-left: 1px solid var(--divider-color); background: var(--card-background-color, var(--primary-background-color)); color: var(--primary-text-color); font: inherit; font-size: 13px; cursor: pointer; opacity: 0.65; }
+        .seg-btn:first-child { border-left: none; }
+        .seg-btn.active { background: var(--primary-color, #ff9800); color: var(--text-primary-color, #fff); opacity: 1; font-weight: 600; }
         .action-field { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
         .color-field { margin-bottom: 8px; }
         .color-row { display: flex; gap: 8px; align-items: center; }

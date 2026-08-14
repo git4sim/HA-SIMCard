@@ -2,6 +2,12 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.1.0]
+
+* **Windows**: each window now has a Window/Door toggle in the editor. Doors get their own
+  icon (`mdi:door-open` / `mdi:door-closed`) and fallback label, everything else (battery,
+  actions, colors) works the same as before.
+
 ## [1.0.3]
 
 * **Windows**: raised the limit from 2 to 3 (editor "Add Window" button and config).
