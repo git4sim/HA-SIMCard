@@ -502,7 +502,17 @@ class HaSimCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    if (!this._rendered) {
+      this._render();
+      return;
+    }
+    // Home Assistant assigns .hass very frequently (on every state change bus-wide).
+    // Rebuilding the whole form on each tick would tear down any open ha-entity-picker
+    // dropdown mid-interaction (it closes the instant it opens). Only refresh the live
+    // hass reference on existing pickers/selectors instead of re-rendering the DOM.
+    this.shadowRoot?.querySelectorAll("ha-entity-picker, ha-selector, ha-icon-picker").forEach((el) => {
+      el.hass = hass;
+    });
   }
 
   get hass() { return this._hass; }
@@ -659,6 +669,7 @@ class HaSimCardEditor extends HTMLElement {
 
   _render() {
     if (!this._hass) return;
+    this._rendered = true;
     const h = this._hass;
     const c = this._config || {};
     this.shadowRoot.innerHTML = `
