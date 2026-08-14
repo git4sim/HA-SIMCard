@@ -1,4 +1,4 @@
-const VERSION = "1.0.2";
+const VERSION = "1.0.3";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -24,7 +24,7 @@ const TRANSLATIONS = {
     humidity_entity: "Humidity Sensor",
     switch_battery: "Switch Battery", switch_battery_entity: "Battery Sensor",
     controls: "Buttons / Switches", control_add: "Add Button", control_max: "Maximum of 4 buttons",
-    window_max: "Maximum of 2 windows",
+    window_max: "Maximum of 3 windows",
     appearance: "Appearance", on_color: "On Color", window_open_color: "Window Open Color", window_closed_color: "Window Closed Color",
     battery_warning_threshold: "Battery Warning Threshold (%)", battery_warning_color: "Battery Warning Color",
     tap_action: "Tap Action", hold_action: "Hold Action", double_tap_action: "Double Tap Action",
@@ -44,7 +44,7 @@ const TRANSLATIONS = {
     humidity_entity: "Feuchtigkeitssensor",
     switch_battery: "Schalter-Batterie", switch_battery_entity: "Batteriesensor",
     controls: "Schalter / Buttons", control_add: "Button hinzufügen", control_max: "Maximal 4 Buttons",
-    window_max: "Maximal 2 Fenster",
+    window_max: "Maximal 3 Fenster",
     appearance: "Darstellung", on_color: "Farbe (an)", window_open_color: "Farbe offen", window_closed_color: "Farbe geschlossen",
     battery_warning_threshold: "Batteriewarnung Schwelle (%)", battery_warning_color: "Batteriewarnung Farbe",
     tap_action: "Antippen", hold_action: "Gedrückt halten", double_tap_action: "Doppelklick",
@@ -225,7 +225,7 @@ class HaSimCard extends HTMLElement {
   getCardSize() {
     const c = this.config || {};
     let size = 1;
-    if ((c.windows || []).length) size += 1;
+    if ((c.windows || []).length) size += Math.ceil((c.windows || []).length / 2);
     if ((c.controls || []).length) size += Math.ceil((c.controls || []).length / 2);
     return size;
   }
@@ -747,7 +747,7 @@ class HaSimCardEditor extends HTMLElement {
   _windowsHTML(h, c) {
     const windows = Array.isArray(c.windows) ? c.windows : [];
     const items = windows.map((w, i) => this._windowItemHTML(h, w, i)).join("");
-    const addDisabled = windows.length >= 2;
+    const addDisabled = windows.length >= 3;
     return `
       <div class="item-list">${items}</div>
       <button type="button" class="add-btn add-window-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "window_add"))}</button>
@@ -789,7 +789,7 @@ class HaSimCardEditor extends HTMLElement {
     const addBtn = root.querySelector(".add-window-btn");
     if (addBtn) {
       addBtn.addEventListener("click", () => {
-        if (windows.length >= 2) return;
+        if (windows.length >= 3) return;
         this._openSections.windows = true;
         this._fire({ ...this._config, windows: [...windows, { entity: "" }] }, true);
       });

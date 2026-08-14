@@ -2,6 +2,10 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.0.3]
+
+* **Windows**: raised the limit from 2 to 3 (editor "Add Window" button and config).
+
 ## [1.0.2]
 
 * **Fix**: every free-text field in the editor (room name, window/battery labels, button

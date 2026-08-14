@@ -27,7 +27,7 @@ temperature/humidity sensor, a switch battery, and up to 4 buttons — show up. 
   * the **temperature/humidity sensor's battery**
   * each **window sensor's battery** (if it has one)
   Each gauge only appears if you've configured that entity — nothing is shown by default.
-* **Window chips** — one per configured window (1–2), colored by open/closed state.
+* **Window chips** — one per configured window (1–3), colored by open/closed state.
 * **Buttons** — up to 4 freely definable switches (lights, switches, fans, covers like garage
   doors), showing name + state (and light brightness %, if applicable).
 
@@ -72,7 +72,7 @@ actually have that entity; anything left empty is simply not rendered on the car
 | `battery_warning_threshold` | `10` | Battery gauges turn `battery_warning_color` at/below this % |
 | `battery_warning_color` | `#f44336` | Warning color for low battery gauges |
 
-### `windows` (list, 1–2 entries)
+### `windows` (list, 1–3 entries)
 
 | Option | Description |
 |---|---|
