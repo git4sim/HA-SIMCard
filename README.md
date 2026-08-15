@@ -67,7 +67,7 @@ actually have that entity; anything left empty is simply not rendered on the car
 |---|---|---|
 | `name` | — | Room name |
 | `icon` | `mdi:home-outline` | Header icon |
-| `collapsible` | `false` | Click the header to collapse/expand devices + buttons |
+| `collapsible` | `false` | Click the header to collapse/expand devices + buttons. Collapsed, the binary devices still show as a row of small icon-only chips |
 | `default_state` | `expanded` | `expanded` · `collapsed` (only relevant when `collapsible: true`) |
 | `remember_state` | `true` | Remember collapsed/expanded state across reloads |
 | `window_open_color` / `window_closed_color` | `#FFA000` / `#4CAF50` | Chip color for `type: window` entries, open/closed |

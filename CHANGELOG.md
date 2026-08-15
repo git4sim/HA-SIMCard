@@ -2,6 +2,13 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.3.0]
+
+* **Collapsed view**: when `collapsible: true` and the card is collapsed, the binary devices
+  (windows/doors/smoke/leak sensors) now show as a compact row of icon-only chips instead of
+  disappearing entirely — colored and iconed the same as the full chips, with a hover tooltip
+  and the same tap/hold actions. Only shows up when there's actually a device configured.
+
 ## [1.2.0]
 
 * **Per-type colors**: window/door/smoke/leak each get their own configurable open/closed

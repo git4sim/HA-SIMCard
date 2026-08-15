@@ -1,4 +1,4 @@
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -280,6 +280,10 @@ class HaSimCard extends HTMLElement {
         .windows { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 6px; }
         .win-chip { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 7px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
         .win-chip ha-icon { --mdc-icon-size: 12px; color: var(--chip-color); }
+        .mini-windows { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 10px; }
+        .mini-windows[hidden] { display: none; }
+        .mini-chip { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); flex-shrink: 0; }
+        .mini-chip ha-icon { --mdc-icon-size: 13px; color: var(--chip-color); }
         .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
         .ctrl-btn { flex: 1 1 0; min-width: 78px; display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctrl-btn:hover { background: rgba(128,128,128,0.14); }
@@ -301,6 +305,7 @@ class HaSimCard extends HTMLElement {
           </div>
           <div id="stats" class="stats"></div>
         </div>
+        <div id="mini-windows" class="mini-windows" hidden></div>
         <div id="body" class="body">
           <div id="windows" class="windows"></div>
           <div id="controls" class="controls"></div>
@@ -338,6 +343,7 @@ class HaSimCard extends HTMLElement {
     const sublineEl = this.shadowRoot.getElementById("subline");
     const statsEl = this.shadowRoot.getElementById("stats");
     const windowsEl = this.shadowRoot.getElementById("windows");
+    const miniWindowsEl = this.shadowRoot.getElementById("mini-windows");
     const controlsEl = this.shadowRoot.getElementById("controls");
     const headerEl = this.shadowRoot.getElementById("header");
     const emptyHint = this.shadowRoot.getElementById("empty-hint");
@@ -347,17 +353,24 @@ class HaSimCard extends HTMLElement {
 
     // --- Header click-to-collapse --- (listener wired once, reads live config on every click
     // so toggling `collapsible` off at runtime actually disables it, not a stale closure)
+    const applyCollapsedState = () => {
+      const collapsed = this.config?.collapsible === true && this._collapsed;
+      this.shadowRoot.getElementById("body").classList.toggle("collapsed", collapsed);
+      // Collapsed view still shows a compact, icon-only row of the binary devices (windows,
+      // doors, smoke/leak sensors) so their state stays visible at a glance.
+      miniWindowsEl.hidden = !collapsed || (this.config?.windows || []).every((w) => !w.entity);
+    };
     if (!headerEl._wired) {
       headerEl._wired = true;
       headerEl.addEventListener("click", () => {
         if (this.config?.collapsible !== true) return;
         this._collapsed = !this._collapsed;
         if (this._collapseKey && this.config?.remember_state !== false) localStorage.setItem(this._collapseKey, this._collapsed ? "1" : "0");
-        this.shadowRoot.getElementById("body").classList.toggle("collapsed", this._collapsed);
+        applyCollapsedState();
       });
     }
     headerEl.classList.toggle("clickable", c.collapsible === true);
-    this.shadowRoot.getElementById("body").classList.toggle("collapsed", c.collapsible === true && this._collapsed);
+    applyCollapsedState();
 
     // --- Temperature / Humidity subline ---
     sublineEl.replaceChildren();
@@ -423,8 +436,9 @@ class HaSimCard extends HTMLElement {
       if (w.battery_entity) addStatRow(w.battery_entity, trimStr(w.battery_label) || trimStr(w.label), w.battery_tap_action, w.battery_hold_action);
     });
 
-    // --- Windows ---
+    // --- Windows --- (and their collapsed-state icon-only mini chips)
     windowsEl.replaceChildren();
+    miniWindowsEl.replaceChildren();
     (c.windows || []).forEach((w) => {
       if (!w.entity) return;
       const st = h.states[w.entity];
@@ -435,18 +449,33 @@ class HaSimCard extends HTMLElement {
       const openColor = trimStr(c[`${type}_open_color`]) || typeCfg.defaultOpenColor;
       const closedColor = trimStr(c[`${type}_closed_color`]) || typeCfg.defaultClosedColor;
       const color = open ? openColor : closedColor;
+      const chipBg = hexToRgba(color.startsWith("#") ? color : "#888888", 0.15) || `${color}22`;
+      const iconName = open ? typeCfg.iconOpen : typeCfg.iconClosed;
+      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, typeCfg.labelKey);
+      const stateTxt = isUnavailable(st) ? getTranslation(h, "state_unavailable") : getTranslation(h, open ? typeCfg.openKey : typeCfg.closedKey);
+      const gestureCfg = { entity: w.entity, tap_action: w.tap_action, hold_action: w.hold_action };
+
       const chip = document.createElement("div");
       chip.className = "win-chip";
       chip.style.setProperty("--chip-color", color);
-      chip.style.setProperty("--chip-bg", hexToRgba(color.startsWith("#") ? color : "#888888", 0.15) || `${color}22`);
+      chip.style.setProperty("--chip-bg", chipBg);
       const icon = document.createElement("ha-icon");
-      icon.icon = open ? typeCfg.iconOpen : typeCfg.iconClosed;
+      icon.icon = iconName;
       chip.appendChild(icon);
-      const label = trimStr(w.label) || st.attributes?.friendly_name || getTranslation(h, typeCfg.labelKey);
-      const stateTxt = isUnavailable(st) ? getTranslation(h, "state_unavailable") : getTranslation(h, open ? typeCfg.openKey : typeCfg.closedKey);
       chip.appendChild(document.createTextNode(`${label} · ${stateTxt}`));
-      attachGestures(chip, h, { entity: w.entity, tap_action: w.tap_action, hold_action: w.hold_action });
+      attachGestures(chip, h, gestureCfg);
       windowsEl.appendChild(chip);
+
+      const miniChip = document.createElement("div");
+      miniChip.className = "mini-chip";
+      miniChip.style.setProperty("--chip-color", color);
+      miniChip.style.setProperty("--chip-bg", chipBg);
+      miniChip.title = `${label} · ${stateTxt}`;
+      const miniIcon = document.createElement("ha-icon");
+      miniIcon.icon = iconName;
+      miniChip.appendChild(miniIcon);
+      attachGestures(miniChip, h, gestureCfg);
+      miniWindowsEl.appendChild(miniChip);
     });
 
     // --- Controls ---
