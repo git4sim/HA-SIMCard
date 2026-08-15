@@ -1,4 +1,4 @@
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -23,7 +23,8 @@ const TRANSLATIONS = {
     battery_entity: "Battery Sensor (optional)", battery_label: "Battery Label (optional)",
     climate: "Temperature / Humidity Sensor", temperature_entity: "Temperature Sensor",
     humidity_entity: "Humidity Sensor",
-    switch_battery: "Switch Battery", switch_battery_entity: "Battery Sensor",
+    switch_battery: "Switch Battery", switch_batteries: "Switch Batteries",
+    switch_battery_add: "Add Switch Battery", switch_battery_max: "Maximum of 4 switch batteries",
     controls: "Buttons / Switches", control_add: "Add Button", control_max: "Maximum of 4 buttons",
     appearance: "Appearance", on_color: "On Color",
     battery_warning_threshold: "Battery Warning Threshold (%)", battery_warning_color: "Battery Warning Color",
@@ -44,7 +45,8 @@ const TRANSLATIONS = {
     battery_entity: "Batteriesensor (optional)", battery_label: "Batterie-Bezeichnung (optional)",
     climate: "Temperatur- / Feuchtigkeitssensor", temperature_entity: "Temperatursensor",
     humidity_entity: "Feuchtigkeitssensor",
-    switch_battery: "Schalter-Batterie", switch_battery_entity: "Batteriesensor",
+    switch_battery: "Schalter-Batterie", switch_batteries: "Schalter-Batterien",
+    switch_battery_add: "Schalter-Batterie hinzufügen", switch_battery_max: "Maximal 4 Schalter-Batterien",
     controls: "Schalter / Buttons", control_add: "Button hinzufügen", control_max: "Maximal 4 Buttons",
     appearance: "Darstellung", on_color: "Farbe (an)",
     battery_warning_threshold: "Batteriewarnung Schwelle (%)", battery_warning_color: "Batteriewarnung Farbe",
@@ -110,6 +112,18 @@ const WINDOW_TYPES = {
 };
 const resolvedWindowType = (w) => (WINDOW_TYPES[w?.type] ? w.type : "window");
 const MAX_BINARY_DEVICES = 10;
+const MAX_SWITCH_BATTERIES = 4;
+
+/**
+ * `switch_batteries` (list) replaces the old single `switch_battery` object so a room can
+ * have more than one physical switch/remote battery. Existing configs that still only have
+ * the singular `switch_battery: {...}` keep working unchanged - read as a one-item list.
+ * The editor always writes the plural list form going forward.
+ */
+const switchBatteriesOf = (c) => {
+  if (Array.isArray(c?.switch_batteries)) return c.switch_batteries;
+  return c?.switch_battery?.entity ? [c.switch_battery] : [];
+};
 
 function parseColorToPickerHex(color) {
   if (!color) return "#ff9800";
@@ -321,7 +335,7 @@ class HaSimCard extends HTMLElement {
     (c.windows || []).forEach((w) => { if (w.entity) ids.add(w.entity); if (w.battery_entity) ids.add(w.battery_entity); });
     const cl = c.climate || {};
     [cl.temperature_entity, cl.humidity_entity, cl.battery_entity].forEach((e) => e && ids.add(e));
-    if (c.switch_battery?.entity) ids.add(c.switch_battery.entity);
+    switchBatteriesOf(c).forEach((sb) => { if (sb.entity) ids.add(sb.entity); });
     (c.controls || []).forEach((ctrl) => { if (ctrl.entity) ids.add(ctrl.entity); });
     const parts = [];
     ids.forEach((id) => {
@@ -426,9 +440,9 @@ class HaSimCard extends HTMLElement {
       attachGestures(row, h, { entity, tap_action: tapCfg, hold_action: holdCfg });
       statsEl.appendChild(row);
     };
-    if (c.switch_battery?.entity) {
-      addStatRow(c.switch_battery.entity, trimStr(c.switch_battery.label), c.switch_battery.tap_action, c.switch_battery.hold_action);
-    }
+    switchBatteriesOf(c).forEach((sb) => {
+      if (sb.entity) addStatRow(sb.entity, trimStr(sb.label), sb.tap_action, sb.hold_action);
+    });
     if (cl.battery_entity) {
       addStatRow(cl.battery_entity, trimStr(cl.battery_label), cl.battery_tap_action, cl.battery_hold_action);
     }
@@ -927,26 +941,70 @@ class HaSimCardEditor extends HTMLElement {
     }
   }
 
-  _switchBatteryHTML(h, c) {
-    const sb = c.switch_battery || {};
+  _switchBatteryItemHTML(h, sb, idx) {
     return `
-      <ha-entity-picker class="sb-entity" label="${escAttr(getTranslation(h, "switch_battery_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
-      ${sb.entity ? `
+      <div class="item-box" data-idx="${idx}">
+        <div class="item-head">
+          <span class="item-title">${escAttr(sb.entity) || `${escAttr(getTranslation(h, "switch_battery"))} ${idx + 1}`}</span>
+          <button type="button" class="del-btn" data-del>${DELETE_ICON}</button>
+        </div>
+        <ha-entity-picker class="sb-entity" label="${escAttr(getTranslation(h, "entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         ${textFieldHTML("sb-label", getTranslation(h, "label"), sb.label)}
         ${actionFieldHTML(h, "sb-tap", getTranslation(h, "tap_action"), sb.tap_action)}
         ${actionFieldHTML(h, "sb-hold", getTranslation(h, "hold_action"), sb.hold_action)}
-      ` : ""}
+      </div>
     `;
   }
 
-  _wireSwitchBattery(root, h, c) {
-    const sb = c.switch_battery || {};
-    const upd = (patch, force = false) => this._fire({ ...this._config, switch_battery: { ...(this._config?.switch_battery || {}), ...patch } }, force);
-    this._wireEntityPicker(root, ".sb-entity", sb.entity, ["sensor"], (v) => upd({ entity: v }, true));
-    if (sb.entity) {
-      this._wireTextField(root, ".sb-label", sb.label, (v) => upd({ label: v }));
-      this._wireActionField(root, "sb-tap", sb.tap_action, (v) => upd({ tap_action: v }));
-      this._wireActionField(root, "sb-hold", sb.hold_action, (v) => upd({ hold_action: v }));
+  _switchBatteriesHTML(h, c) {
+    const switchBatteries = switchBatteriesOf(c);
+    const items = switchBatteries.map((sb, i) => this._switchBatteryItemHTML(h, sb, i)).join("");
+    const addDisabled = switchBatteries.length >= MAX_SWITCH_BATTERIES;
+    return `
+      <div class="item-list">${items}</div>
+      <button type="button" class="add-btn add-switch-battery-btn"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "switch_battery_add"))}</button>
+      ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "switch_battery_max"))}</div>` : ""}
+    `;
+  }
+
+  _wireSwitchBatteries(root, h, c) {
+    const switchBatteries = switchBatteriesOf(c);
+    // Scoped to this section only - see the identical comment in _wireWindows.
+    const list = root.querySelector('[data-sec="switch_battery"] .item-list');
+    switchBatteries.forEach((sb, idx) => {
+      const box = list?.querySelector(`.item-box[data-idx="${idx}"]`);
+      if (!box) return;
+      const upd = (patch, force = false) => {
+        const arr = [...switchBatteriesOf(this._config)];
+        arr[idx] = { ...arr[idx], ...patch };
+        // Once edited through this list UI, switch_batteries (plural) becomes the source of
+        // truth - drop the legacy singular key so the two can't disagree.
+        const next = { ...this._config, switch_batteries: arr };
+        delete next.switch_battery;
+        this._fire(next, force);
+      };
+      box.querySelector("[data-del]")?.addEventListener("click", () => {
+        const arr = [...switchBatteriesOf(this._config)];
+        arr.splice(idx, 1);
+        const next = { ...this._config };
+        delete next.switch_battery;
+        if (arr.length) next.switch_batteries = arr; else delete next.switch_batteries;
+        this._fire(next, true);
+      });
+      this._wireEntityPicker(box, ".sb-entity", sb.entity, ["sensor"], (v) => upd({ entity: v }, true));
+      this._wireTextField(box, ".sb-label", sb.label, (v) => upd({ label: v }));
+      this._wireActionField(box, "sb-tap", sb.tap_action, (v) => upd({ tap_action: v }));
+      this._wireActionField(box, "sb-hold", sb.hold_action, (v) => upd({ hold_action: v }));
+    });
+    const addBtn = root.querySelector(".add-switch-battery-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", () => {
+        if (switchBatteries.length >= MAX_SWITCH_BATTERIES) return;
+        this._openSections.switch_battery = true;
+        const next = { ...this._config, switch_batteries: [...switchBatteries, { entity: "" }] };
+        delete next.switch_battery;
+        this._fire(next, true);
+      });
     }
   }
 
@@ -1115,7 +1173,7 @@ class HaSimCardEditor extends HTMLElement {
         ${this._sectionHTML("general", "general", this._generalHTML(h, c))}
         ${this._sectionHTML("windows", "binary_devices", this._windowsHTML(h, c))}
         ${this._sectionHTML("climate", "climate", this._climateHTML(h, c))}
-        ${this._sectionHTML("switch_battery", "switch_battery", this._switchBatteryHTML(h, c))}
+        ${this._sectionHTML("switch_battery", "switch_batteries", this._switchBatteriesHTML(h, c))}
         ${this._sectionHTML("controls", "controls", this._controlsHTML(h, c))}
         ${this._sectionHTML("appearance", "appearance", this._appearanceHTML(h, c))}
       </div>
@@ -1133,7 +1191,7 @@ class HaSimCardEditor extends HTMLElement {
     if (this._openSections.general) this._wireGeneral(wrap, h, c);
     if (this._openSections.windows) this._wireWindows(wrap, h, c);
     if (this._openSections.climate) this._wireClimate(wrap, h, c);
-    if (this._openSections.switch_battery) this._wireSwitchBattery(wrap, h, c);
+    if (this._openSections.switch_battery) this._wireSwitchBatteries(wrap, h, c);
     if (this._openSections.controls) this._wireControls(wrap, h, c);
     if (this._openSections.appearance) this._wireAppearance(wrap, h, c);
   }

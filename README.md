@@ -24,7 +24,7 @@ detectors, leak sensors, a temperature/humidity sensor, a switch battery, and up
 
 * **Header** — room name + icon, with an optional temperature/humidity line underneath.
 * **Stat gauges** (top-right, stacked) — small battery-style gauges for:
-  * a **switch/remote battery** (e.g. a physical wall switch)
+  * up to 4 **switch/remote batteries** (e.g. physical wall switches)
   * the **temperature/humidity sensor's battery**
   * each **binary device's battery** (if it has one)
   Each gauge only appears if you've configured that entity — nothing is shown by default.
@@ -97,13 +97,19 @@ actually have that entity; anything left empty is simply not rendered on the car
 | `humidity_entity` / `humidity_label` / `humidity_tap_action` / `humidity_hold_action` | Humidity sensor shown in the header subline |
 | `battery_entity` / `battery_label` / `battery_tap_action` / `battery_hold_action` | Battery of the temperature/humidity sensor device — adds a stat gauge |
 
-### `switch_battery` (single object, optional)
+### `switch_batteries` (list, up to 4 entries)
+
+One stat gauge per entry — for rooms with more than one physical switch/remote.
 
 | Option | Description |
 |---|---|
 | `entity` | Battery sensor of a physical switch/remote in the room |
 | `label` | Label for the gauge (e.g. "Lichtschalter") |
 | `tap_action` / `hold_action` | Action on that gauge |
+
+> The old single-object `switch_battery: {entity: ..., ...}` form still works if you have it
+> in an existing config — it's read as a one-item list. The editor always writes the new
+> `switch_batteries` list form.
 
 ### `controls` (list, up to 4 entries)
 
@@ -151,9 +157,11 @@ climate:
   battery_entity: sensor.gaestezimmer_klimasensor_batterie
   battery_label: Klimasensor
 
-switch_battery:
-  entity: sensor.gaestezimmer_schalter_batterie
-  label: Schalterbatterie
+switch_batteries:
+  - entity: sensor.gaestezimmer_schalter_batterie
+    label: Schalterbatterie
+  - entity: sensor.gaestezimmer_nachttisch_schalter_batterie
+    label: Schalter Nachttisch
 
 controls:
   - entity: light.gaestezimmer_decke

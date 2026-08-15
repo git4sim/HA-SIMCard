@@ -2,6 +2,14 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.4.0]
+
+* **Multiple switch batteries**: `switch_battery` (single object) is now `switch_batteries`
+  (list, up to 4), so a room with more than one physical switch/remote can show a battery
+  gauge for each. Existing configs using the old singular `switch_battery: {...}` keep
+  working unchanged (read as a one-item list); the editor migrates it to the plural list form
+  as soon as you touch that section.
+
 ## [1.3.0]
 
 * **Collapsed view**: when `collapsible: true` and the card is collapsed, the binary devices
