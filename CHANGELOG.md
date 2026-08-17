@@ -125,6 +125,20 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.1.2]
+
+* **Fix**: a node's disk-temperature pills (from `drives`) could overflow past the edge of
+  the card when the drive's `label` was long (e.g. a full disk model name like
+  "SanDisk SD6SB1M 32G") — the label was concatenated straight into the pill's text with no
+  width limit. The label now truncates with an ellipsis at a fixed width (full text still
+  available as a hover tooltip); the temperature value itself is never truncated.
+* **Fix**: container/VM tiles defaulted every tap to `toggle`, which fails silently for
+  `binary_sensor`-backed containers (`binary_sensor` has no toggle service — only
+  `switch`/`light`/`fan`/`cover`/`input_boolean` do). The default tap action is now chosen
+  per entity domain: `toggle` for the domains that support it, `more-info` for everything
+  else (including `binary_sensor` and plain `sensor`). The editor's action dropdown reflects
+  this resolved default instead of always showing "None" for an unset tap/hold action.
+
 ### [1.1.1]
 
 * **Fix**: numeric sensor values (CPU %, RAM, storage, temperatures, ...) shown in node and

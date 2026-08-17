@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.1.1";
+const VERSION = "1.1.2";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1340,6 +1340,12 @@ const isUnavailable = (st) => !st || st.state === "unavailable" || st.state === 
 
 const RUNNING_STATES = new Set(["on", "running", "active", "home", "playing"]);
 const isRunning = (st) => st && RUNNING_STATES.has(String(st.state).toLowerCase().trim());
+
+const TOGGLABLE_DOMAINS = new Set(["switch", "light", "fan", "cover", "input_boolean"]);
+function defaultTapAction(entity) {
+  const domain = String(entity || "").split(".")[0];
+  return TOGGLABLE_DOMAINS.has(domain) ? { action: "toggle" } : { action: "more-info" };
+}
 
 function parseColorToPickerHex(color) {
   if (!color) return "#E57000";
@@ -1501,9 +1507,11 @@ class HaInfraProxmox extends HTMLElement {
         .node-name { font-size: 13px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .node-state { font-size: 11px; color: var(--node-color, var(--secondary-text-color)); }
         .node-mini-stats { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; }
-        .node-mini-stat { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
+        .node-mini-stat { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; max-width: 100%; }
         .node-mini-stat.warn { color: var(--warn-color, #f44336); font-weight: 700; }
-        .node-mini-stat ha-icon { --mdc-icon-size: 14px; color: inherit; }
+        .node-mini-stat ha-icon { --mdc-icon-size: 14px; color: inherit; flex-shrink: 0; }
+        .node-mini-stat-label { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
+        .node-mini-stat-value { flex-shrink: 0; }
         .node-containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 2px 14px; margin-left: 8px; border-left: 2px solid var(--divider-color); }
         .containers { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
         .other-containers-label { font-size: 11px; font-weight: 600; opacity: 0.6; padding: 6px 14px 0; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -1569,9 +1577,17 @@ class HaInfraProxmox extends HTMLElement {
       const mIcon = document.createElement("ha-icon");
       mIcon.icon = iconName;
       mini.appendChild(mIcon);
-      const label = opts.label ? `${opts.label}: ` : "";
-      mini.appendChild(document.createTextNode(`${label}${fmtState(est)}`));
-      if (opts.title) mini.title = opts.title;
+      if (opts.label) {
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "node-mini-stat-label";
+        labelSpan.textContent = `${opts.label}:`;
+        mini.appendChild(labelSpan);
+      }
+      const valueSpan = document.createElement("span");
+      valueSpan.className = "node-mini-stat-value";
+      valueSpan.textContent = fmtState(est);
+      mini.appendChild(valueSpan);
+      mini.title = opts.title || (opts.label ? `${opts.label}: ${fmtState(est)}` : "");
       wrap.appendChild(mini);
     };
     add(n.containers_entity, "mdi:package-variant-closed");
@@ -1582,7 +1598,8 @@ class HaInfraProxmox extends HTMLElement {
     add(n.temperature_entity, "mdi:thermometer", { warnIfAtOrAbove: threshold });
     (n.drives || []).slice(0, MAX_DRIVES_PER_NODE).forEach((d, i) => {
       if (!d.entity) return;
-      add(d.entity, "mdi:thermometer", { warnIfAtOrAbove: threshold, label: trimStr(d.label) || `${i + 1}`, title: trimStr(d.label) });
+      const label = trimStr(d.label) || `Disk ${i + 1}`;
+      add(d.entity, "mdi:thermometer", { warnIfAtOrAbove: threshold, label });
     });
     return wrap;
   }
@@ -1635,7 +1652,7 @@ class HaInfraProxmox extends HTMLElement {
     if (!unavailable) {
       attachGestures(tile, h, {
         entity: ctr.entity,
-        tap_action: ctr.tap_action || { action: "toggle" },
+        tap_action: ctr.tap_action || defaultTapAction(ctr.entity),
         hold_action: ctr.hold_action || { action: "more-info" },
         double_tap_action: ctr.double_tap_action || { action: "none" }
       });
@@ -2098,8 +2115,8 @@ class HaInfraProxmoxEditor extends HTMLElement {
         <ha-entity-picker class="ctr-cpu" label="${escAttr(getTranslation(h, "cpu_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="ctr-ram" label="${escAttr(getTranslation(h, "ram_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="ctr-storage" label="${escAttr(getTranslation(h, "storage_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
-        ${actionFieldHTML(h, "ctr-tap", getTranslation(h, "tap_action"), ctr.tap_action)}
-        ${actionFieldHTML(h, "ctr-hold", getTranslation(h, "hold_action"), ctr.hold_action)}
+        ${actionFieldHTML(h, "ctr-tap", getTranslation(h, "tap_action"), ctr.tap_action || defaultTapAction(ctr.entity))}
+        ${actionFieldHTML(h, "ctr-hold", getTranslation(h, "hold_action"), ctr.hold_action || { action: "more-info" })}
         ${actionFieldHTML(h, "ctr-dbl", getTranslation(h, "double_tap_action"), ctr.double_tap_action)}
       </div>
     `;
@@ -2154,7 +2171,7 @@ class HaInfraProxmoxEditor extends HTMLElement {
       addBtn.addEventListener("click", () => {
         if (containers.length >= MAX_CONTAINERS) return;
         this._openSections.containers = true;
-        this._fire({ ...this._config, containers: [...containers, { entity: "", tap_action: { action: "toggle" }, hold_action: { action: "more-info" } }] }, true);
+        this._fire({ ...this._config, containers: [...containers, { entity: "" }] }, true);
       });
     }
   }
