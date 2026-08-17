@@ -1,4 +1,4 @@
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -196,7 +196,11 @@ function attachGestures(node, hass, cfg) {
   node.style.cursor = "pointer";
   let holdTimer = null, tapTimer = null, held = false;
   const cancelHold = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
-  node.addEventListener("pointerdown", () => {
+  // stopPropagation on pointerdown/up (not just click) so a gesture-enabled element nested
+  // inside another one - e.g. a battery gauge inside a window chip - only fires its own
+  // action, not the parent's too.
+  node.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
     held = false;
     if (hold.action !== "none") {
       holdTimer = setTimeout(() => {
@@ -205,7 +209,8 @@ function attachGestures(node, hass, cfg) {
       }, 500);
     }
   });
-  node.addEventListener("pointerup", () => {
+  node.addEventListener("pointerup", (e) => {
+    e.stopPropagation();
     cancelHold();
     if (held) { held = false; return; }
     if (dbl.action !== "none") {
@@ -293,7 +298,10 @@ class HaSimCard extends HTMLElement {
         .body.collapsed { max-height: 0 !important; opacity: 0; }
         .windows { display: flex; flex-direction: column; gap: 4px; padding: 0 14px 6px; }
         .win-chip { display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 7px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); }
-        .win-chip ha-icon { --mdc-icon-size: 12px; color: var(--chip-color); }
+        .win-chip ha-icon { --mdc-icon-size: 12px; color: var(--chip-color); flex-shrink: 0; }
+        .win-chip-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .win-chip-batt { margin-left: auto; padding-left: 6px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; cursor: pointer; }
+        .win-chip-batt .stat-value { font-size: 10px; min-width: 0; }
         .mini-windows { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 14px 10px; }
         .mini-windows[hidden] { display: none; }
         .mini-chip { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--chip-bg); color: var(--chip-color); flex-shrink: 0; }
@@ -408,22 +416,20 @@ class HaSimCard extends HTMLElement {
       sublineEl.appendChild(span);
     }
 
-    // --- Stat gauges (switch battery, climate battery, per-window battery) ---
+    // --- Stat gauges (switch batteries, climate battery) --- per-window/door battery gauges
+    // live inline in their own chip instead (see the windows loop below) rather than up here,
+    // so a room with several doors doesn't grow a header stat row per door on top of its chip.
     statsEl.replaceChildren();
     const threshold = Number.isFinite(Number(c.battery_warning_threshold)) ? Number(c.battery_warning_threshold) : 10;
     const warnColor = trimStr(c.battery_warning_color) || "#f44336";
-    const addStatRow = (entity, label, tapCfg, holdCfg) => {
+    // Builds just the gauge + percentage pair (no label, no attached gestures) - shared by
+    // the header stat rows and the inline per-chip battery indicator below.
+    const buildBatteryGauge = (entity) => {
       const st = h.states[entity];
-      if (!st || isUnavailable(st)) return;
+      if (!st || isUnavailable(st)) return null;
       const pct = clampPct(st.state);
-      if (pct == null) return;
+      if (pct == null) return null;
       const isWarn = pct <= threshold;
-      const row = document.createElement("div");
-      row.className = "stat-row";
-      const lbl = document.createElement("span");
-      lbl.className = "stat-label";
-      lbl.textContent = label || st.attributes?.friendly_name || entity;
-      row.appendChild(lbl);
       const gauge = document.createElement("span");
       gauge.className = "stat-gauge";
       gauge.style.setProperty("--fill", `${pct}%`);
@@ -431,12 +437,23 @@ class HaSimCard extends HTMLElement {
       const fill = document.createElement("span");
       fill.className = "stat-fill";
       gauge.appendChild(fill);
-      row.appendChild(gauge);
       const val = document.createElement("span");
       val.className = "stat-value";
       val.textContent = `${pct}%`;
       if (isWarn) val.style.setProperty("--val-color", warnColor);
-      row.appendChild(val);
+      return { gauge, val };
+    };
+    const addStatRow = (entity, label, tapCfg, holdCfg) => {
+      const g = buildBatteryGauge(entity);
+      if (!g) return;
+      const row = document.createElement("div");
+      row.className = "stat-row";
+      const lbl = document.createElement("span");
+      lbl.className = "stat-label";
+      lbl.textContent = label || h.states[entity].attributes?.friendly_name || entity;
+      row.appendChild(lbl);
+      row.appendChild(g.gauge);
+      row.appendChild(g.val);
       attachGestures(row, h, { entity, tap_action: tapCfg, hold_action: holdCfg });
       statsEl.appendChild(row);
     };
@@ -446,9 +463,6 @@ class HaSimCard extends HTMLElement {
     if (cl.battery_entity) {
       addStatRow(cl.battery_entity, trimStr(cl.battery_label), cl.battery_tap_action, cl.battery_hold_action);
     }
-    (c.windows || []).forEach((w) => {
-      if (w.battery_entity) addStatRow(w.battery_entity, trimStr(w.battery_label) || trimStr(w.label), w.battery_tap_action, w.battery_hold_action);
-    });
 
     // --- Windows --- (and their collapsed-state icon-only mini chips)
     windowsEl.replaceChildren();
@@ -476,7 +490,24 @@ class HaSimCard extends HTMLElement {
       const icon = document.createElement("ha-icon");
       icon.icon = iconName;
       chip.appendChild(icon);
-      chip.appendChild(document.createTextNode(`${label} · ${stateTxt}`));
+      const text = document.createElement("span");
+      text.className = "win-chip-text";
+      text.textContent = `${label} · ${stateTxt}`;
+      chip.appendChild(text);
+      if (w.battery_entity) {
+        const battGauge = buildBatteryGauge(w.battery_entity);
+        if (battGauge) {
+          const battWrap = document.createElement("span");
+          battWrap.className = "win-chip-batt";
+          // No room for a visible text label next to the gauge here - keep battery_label
+          // useful as a hover tooltip instead of just dropping it.
+          battWrap.title = trimStr(w.battery_label) || h.states[w.battery_entity].attributes?.friendly_name || w.battery_entity;
+          battWrap.appendChild(battGauge.gauge);
+          battWrap.appendChild(battGauge.val);
+          attachGestures(battWrap, h, { entity: w.battery_entity, tap_action: w.battery_tap_action, hold_action: w.battery_hold_action });
+          chip.appendChild(battWrap);
+        }
+      }
       attachGestures(chip, h, gestureCfg);
       windowsEl.appendChild(chip);
 

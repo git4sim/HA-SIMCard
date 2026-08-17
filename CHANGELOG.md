@@ -2,6 +2,16 @@
 
 All notable changes to HA SimCard are documented here.
 
+## [1.5.0]
+
+* **Binary device battery gauges moved inline**: a window/door/smoke/leak entry's
+  `battery_entity` gauge now sits right-aligned inside that device's own chip row instead of
+  as a separate stat row up in the header — a room with several battery-equipped devices no
+  longer grows a header row per device on top of its chip. `battery_label` still applies, now
+  as the gauge's hover tooltip (there's no room for visible text next to it). Tapping/holding
+  the gauge still fires `battery_tap_action`/`battery_hold_action` independently of the
+  chip's own actions.
+
 ## [1.4.0]
 
 * **Multiple switch batteries**: `switch_battery` (single object) is now `switch_batteries`

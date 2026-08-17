@@ -26,11 +26,12 @@ detectors, leak sensors, a temperature/humidity sensor, a switch battery, and up
 * **Stat gauges** (top-right, stacked) — small battery-style gauges for:
   * up to 4 **switch/remote batteries** (e.g. physical wall switches)
   * the **temperature/humidity sensor's battery**
-  * each **binary device's battery** (if it has one)
   Each gauge only appears if you've configured that entity — nothing is shown by default.
 * **Binary device chips** — one per configured device (1–10). Each is a window, door, smoke
   detector, or leak sensor — own icon, own state wording (Open/Closed, Smoke/OK, Wet/Dry),
-  and its own configurable on/off color pair per type.
+  own configurable on/off color pair per type, and — if it has a battery sensor configured —
+  a small battery gauge right-aligned in that same row, instead of a separate stat gauge up
+  top.
 * **Buttons** — up to 4 freely definable switches (lights, switches, fans, covers like garage
   doors), showing name + state (and light brightness %, if applicable).
 
@@ -85,8 +86,8 @@ actually have that entity; anything left empty is simply not rendered on the car
 | `type` | `window` | `window` · `door` · `smoke` · `leak` — switches the chip icon, its two state labels (Open/Closed, Smoke/OK, Wet/Dry), its color pair (see above), and the fallback label if `label` is empty |
 | `label` | — | Custom label (falls back to friendly name) |
 | `tap_action` / `hold_action` | — | Action on the chip |
-| `battery_entity` | — | Optional battery sensor for this device — adds a stat gauge |
-| `battery_label` | — | Label for that gauge |
+| `battery_entity` | — | Optional battery sensor for this device — shown as a small gauge inline at the right edge of its chip |
+| `battery_label` | — | Hover tooltip for that gauge (falls back to friendly name) |
 | `battery_tap_action` / `battery_hold_action` | — | Action on that gauge |
 
 ### `climate` (single object, all optional)
