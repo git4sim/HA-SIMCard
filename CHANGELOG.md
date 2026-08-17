@@ -125,6 +125,14 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.2.0]
+
+* **Container/VM tiles redesigned**: the "In Betrieb"/"Gestoppt"/"Nicht verfügbar" state text
+  is gone, replaced by a small round status badge top-right of the tile, next to the name —
+  green check (running), red X (stopped), amber warning (unavailable). Frees up enough space
+  that tiles pack three per row again instead of two (`flex-basis` 45% → 31%), matching the
+  earlier CPU/RAM/storage layout without the wider tiles it needed before.
+
 ### [1.1.3]
 
 * **Node stat layout**: general stats (containers/VMs/CPU/RAM/storage) and per-disk

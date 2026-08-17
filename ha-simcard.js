@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.1.3";
+const VERSION = "1.2.0";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1514,15 +1514,20 @@ class HaInfraProxmox extends HTMLElement {
         .node-mini-stat-label { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
         .node-mini-stat-value { flex-shrink: 0; }
         .node-containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 2px 14px; margin-left: 8px; border-left: 2px solid var(--divider-color); }
-        .containers { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
+        .containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 14px; }
         .other-containers-label { font-size: 11px; font-weight: 600; opacity: 0.6; padding: 6px 14px 0; text-transform: uppercase; letter-spacing: 0.03em; }
-        .ctr-tile { flex: 1 1 45%; min-width: 130px; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
+        .ctr-tile { flex: 1 1 31%; min-width: 108px; display: flex; align-items: flex-start; gap: 6px; padding: 8px 9px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctr-tile:hover { background: rgba(128,128,128,0.14); }
-        .ctr-tile ha-icon.ctr-icon { --mdc-icon-size: 18px; color: var(--ctr-color, var(--secondary-text-color)); flex-shrink: 0; margin-top: 1px; }
-        .ctr-tile.unavailable { opacity: 0.5; cursor: default; }
+        .ctr-tile ha-icon.ctr-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); flex-shrink: 0; margin-top: 1px; }
+        .ctr-tile.unavailable { opacity: 0.6; cursor: default; }
         .ctr-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
-        .ctr-name { font-size: 12.5px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ctr-state { font-size: 10.5px; color: var(--ctr-color, var(--secondary-text-color)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ctr-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+        .ctr-name { font-size: 12.5px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .ctr-status-badge { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0; }
+        .ctr-status-badge ha-icon { --mdc-icon-size: 12px; color: #fff; }
+        .ctr-status-badge.is-running { background: #4CAF50; }
+        .ctr-status-badge.is-stopped { background: #f44336; }
+        .ctr-status-badge.is-unavailable { background: #FFA000; }
         .ctr-mini-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
         .ctr-mini-stat { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--secondary-text-color); white-space: nowrap; }
         .ctr-mini-stat ha-icon { --mdc-icon-size: 12px; color: inherit; }
@@ -1616,14 +1621,12 @@ class HaInfraProxmox extends HTMLElement {
     return wrap;
   }
 
-  _renderContainerTile(h, ctr, runColor, stopColor) {
+  _renderContainerTile(h, ctr) {
     const st = h.states[ctr.entity];
     const unavailable = isUnavailable(st);
     const running = !unavailable && isRunning(st);
-    const color = running ? runColor : stopColor;
     const tile = document.createElement("div");
     tile.className = `ctr-tile${unavailable ? " unavailable" : ""}`;
-    tile.style.setProperty("--ctr-color", unavailable ? "var(--secondary-text-color)" : color);
     if (ctr.show_icon !== false) {
       const icon = document.createElement("ha-icon");
       icon.className = "ctr-icon";
@@ -1632,14 +1635,21 @@ class HaInfraProxmox extends HTMLElement {
     }
     const txt = document.createElement("div");
     txt.className = "ctr-txt";
+    const head = document.createElement("div");
+    head.className = "ctr-head";
     const nameSpan = document.createElement("span");
     nameSpan.className = "ctr-name";
     nameSpan.textContent = trimStr(ctr.name) || st?.attributes?.friendly_name || ctr.entity;
-    txt.appendChild(nameSpan);
-    const stateSpan = document.createElement("span");
-    stateSpan.className = "ctr-state";
-    stateSpan.textContent = unavailable ? getTranslation(h, "state_unavailable") : getTranslation(h, running ? "state_running" : "state_stopped");
-    txt.appendChild(stateSpan);
+    head.appendChild(nameSpan);
+    const badge = document.createElement("span");
+    const badgeState = unavailable ? "unavailable" : (running ? "running" : "stopped");
+    badge.className = `ctr-status-badge is-${badgeState}`;
+    badge.title = unavailable ? getTranslation(h, "state_unavailable") : getTranslation(h, running ? "state_running" : "state_stopped");
+    const badgeIcon = document.createElement("ha-icon");
+    badgeIcon.icon = unavailable ? "mdi:alert" : (running ? "mdi:check" : "mdi:close");
+    badge.appendChild(badgeIcon);
+    head.appendChild(badge);
+    txt.appendChild(head);
 
     const miniWrap = document.createElement("div");
     miniWrap.className = "ctr-mini-stats";
@@ -1752,7 +1762,7 @@ class HaInfraProxmox extends HTMLElement {
           grid.className = "node-containers";
           own.forEach((ctr) => {
             groupedIds.add(ctr);
-            grid.appendChild(this._renderContainerTile(h, ctr, runColor, stopColor));
+            grid.appendChild(this._renderContainerTile(h, ctr));
           });
           block.appendChild(grid);
         }
@@ -1765,7 +1775,7 @@ class HaInfraProxmox extends HTMLElement {
     const nodeIds = new Set(nodes.filter((n) => n.id).map((n) => n.id));
     const ungrouped = allContainers.filter((ctr) => !groupedIds.has(ctr) && (!ctr.node_id || !nodeIds.has(ctr.node_id)));
     containersEl.replaceChildren();
-    ungrouped.forEach((ctr) => containersEl.appendChild(this._renderContainerTile(h, ctr, runColor, stopColor)));
+    ungrouped.forEach((ctr) => containersEl.appendChild(this._renderContainerTile(h, ctr)));
     const showOtherLabel = ungrouped.length > 0 && groupedIds.size > 0;
     otherLabelEl.hidden = !showOtherLabel;
     if (showOtherLabel) otherLabelEl.textContent = getTranslation(h, "other_containers");
