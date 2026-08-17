@@ -18,6 +18,11 @@ detectors, leak sensors, a temperature/humidity sensor, a switch battery, and up
 > position controls have been removed entirely — this card is not a general-purpose
 > dashboard tile.
 
+This repository also includes two standalone infrastructure cards, each its own custom
+element/file/config schema, installable independently of HA SimCard and of each other:
+**[HA Infra: Proxmox](#-ha-infra-proxmox)** (nodes + container/VM tiles) and
+**[HA Infra: NAS](#-ha-infra-nas)** (one device's drive temperatures per card).
+
 ---
 
 ## ✨ What it shows
@@ -184,6 +189,157 @@ smoke_closed_color: "#4CAF50"
 
 > The entity IDs above are made up for illustration — swap in your own `binary_sensor` /
 > `sensor` / `light` (or `switch` / `fan` / `cover`) entities.
+
+---
+
+## 🖥️ HA Infra: Proxmox
+
+![Preview](preview-proxmox.png)
+
+A compact Proxmox overview card: one row per node (status, running containers, running VMs,
+free memory, optional temperature) and a grid of container/VM toggle tiles below — instead of
+one long list with a separate row per stat per node.
+
+### Installation
+
+Same repository, separate file/resource:
+1. Download `ha-infra-proxmox.js` from the repository (HACS installs it alongside
+   `ha-simcard.js` automatically once this repo is added; manual installs need the file
+   copied into `/config/www/` themselves).
+2. Add a resource: URL `/local/ha-infra-proxmox.js` · Type: JavaScript Module.
+3. Add the card via **"Add Card"** → **HA Infra: Proxmox**.
+
+### Configuration
+
+#### Card level
+
+| Option | Default | Description |
+|---|---|---|
+| `name` | — | Card title |
+| `icon` | `mdi:server` | Header icon |
+| `running_color` | `#E57000` | Status icon / tile color when running |
+| `stopped_color` | `#9b9b9b` | Status icon / tile color when stopped |
+
+#### `nodes` (list, up to 10 entries)
+
+| Option | Description |
+|---|---|
+| `name` | Node label (falls back to friendly name) |
+| `status_entity` | `binary_sensor` (or `sensor`) — on/`running` = node up |
+| `containers_entity` | Optional `sensor` — running container count |
+| `vms_entity` | Optional `sensor` — running VM count |
+| `memory_entity` | Optional `sensor` — free memory (shown with its own unit) |
+| `temperature_entity` | Optional `sensor` — node temperature |
+| `tap_action` / `hold_action` | Action on the node row |
+
+#### `containers` (list, up to 20 entries) — container/VM toggle tiles
+
+| Option | Default | Description |
+|---|---|---|
+| `entity` | — | `switch` / `binary_sensor` / `sensor` |
+| `name` | friendly name | Tile label |
+| `icon` | `mdi:chip` | Icon override |
+| `show_icon` | `true` | Show/hide the icon |
+| `tap_action` | `toggle` | Tap action |
+| `hold_action` | `more-info` | Hold action |
+| `double_tap_action` | `none` | Double-tap action |
+
+Actions accept the same `more-info` · `toggle` · `navigate` · `call-service` · `none` as HA
+SimCard.
+
+### Example YAML
+
+```yaml
+type: custom:ha-infra-proxmox
+name: Proxmox
+icon: mdi:server
+
+nodes:
+  - name: Node pve1
+    status_entity: binary_sensor.pve1_status
+    containers_entity: sensor.pve1_containers_running
+    vms_entity: sensor.pve1_vms_running
+    memory_entity: sensor.pve1_memory_free
+    temperature_entity: sensor.pve1_temperature
+  - name: Node pve2
+    status_entity: binary_sensor.pve2_status
+    containers_entity: sensor.pve2_containers_running
+    vms_entity: sensor.pve2_vms_running
+    memory_entity: sensor.pve2_memory_free
+
+containers:
+  - entity: switch.pihole1
+    name: Pihole1
+  - entity: switch.certbot
+    name: Certbot
+  - entity: switch.nextcloud
+    name: Nextcloud
+```
+
+> Not built for per-stat drill-down: tapping a node row targets its `status_entity` only, not
+> the individual container/VM/memory/temperature sensors next to it.
+
+---
+
+## 💾 HA Infra: NAS
+
+![Preview](preview-nas.png)
+
+A compact NAS overview card: one device per card instance (matching HA SimCard's one-room-
+per-card approach) — system temperature in the header, drive temperatures listed below.
+Any drive at/above the warning threshold turns red.
+
+### Installation
+
+1. Download `ha-infra-nas.js` from the repository (see note above on HACS vs. manual).
+2. Add a resource: URL `/local/ha-infra-nas.js` · Type: JavaScript Module.
+3. Add the card via **"Add Card"** → **HA Infra: NAS**.
+
+### Configuration
+
+#### Card level
+
+| Option | Default | Description |
+|---|---|---|
+| `name` | — | Device name |
+| `icon` | `mdi:nas` | Header icon |
+| `system_temperature_entity` | — | Optional `sensor` shown in the header |
+| `system_temperature_label` | — | Label override |
+| `system_temperature_tap_action` / `_hold_action` | — | Action on the header temperature |
+| `temperature_warning_threshold` | `45` | Drives at/above this value turn red |
+| `temperature_warning_color` | `#f44336` | That warning color |
+
+#### `drives` (list, up to 12 entries)
+
+| Option | Description |
+|---|---|
+| `entity` | `sensor` — drive temperature |
+| `label` | Row label (falls back to friendly name) |
+| `tap_action` / `hold_action` | Action on that row |
+
+### Example YAML
+
+```yaml
+type: custom:ha-infra-nas
+name: Hauptspeicher-NAS
+icon: mdi:nas
+system_temperature_entity: sensor.nas1_temperature
+
+drives:
+  - entity: sensor.nas1_drive1_temperature
+    label: Laufwerk 1
+  - entity: sensor.nas1_drive2_temperature
+    label: Laufwerk 2
+  - entity: sensor.nas1_drive3_temperature
+    label: Laufwerk 3
+  - entity: sensor.nas1_drive4_temperature
+    label: Laufwerk 4
+
+temperature_warning_threshold: 45
+temperature_warning_color: "#f44336"
+```
+
+> More than one NAS? Add one card instance per device, same as HA SimCard's per-room cards.
 
 ---
 

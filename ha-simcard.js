@@ -1,3 +1,6 @@
+(function () {
+  "use strict";
+
 const VERSION = "1.5.0";
 const LOG_FLAG = `customCards_HaSimCard_Logged_${VERSION}`;
 
@@ -1243,3 +1246,5 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
     preview: true
   });
 }
+
+})();

@@ -1,8 +1,10 @@
 # Changelog
 
-All notable changes to HA SimCard are documented here.
+This repository hosts three independent cards, each with its own version history below.
 
-## [1.5.0]
+## HA SimCard
+
+### [1.5.0]
 
 * **Binary device battery gauges moved inline**: a window/door/smoke/leak entry's
   `battery_entity` gauge now sits right-aligned inside that device's own chip row instead of
@@ -12,7 +14,7 @@ All notable changes to HA SimCard are documented here.
   the gauge still fires `battery_tap_action`/`battery_hold_action` independently of the
   chip's own actions.
 
-## [1.4.0]
+### [1.4.0]
 
 * **Multiple switch batteries**: `switch_battery` (single object) is now `switch_batteries`
   (list, up to 4), so a room with more than one physical switch/remote can show a battery
@@ -20,14 +22,14 @@ All notable changes to HA SimCard are documented here.
   working unchanged (read as a one-item list); the editor migrates it to the plural list form
   as soon as you touch that section.
 
-## [1.3.0]
+### [1.3.0]
 
 * **Collapsed view**: when `collapsible: true` and the card is collapsed, the binary devices
   (windows/doors/smoke/leak sensors) now show as a compact row of icon-only chips instead of
   disappearing entirely — colored and iconed the same as the full chips, with a hover tooltip
   and the same tap/hold actions. Only shows up when there's actually a device configured.
 
-## [1.2.0]
+### [1.2.0]
 
 * **Per-type colors**: window/door/smoke/leak each get their own configurable open/closed
   color pair (`window_open_color`/`window_closed_color`, `door_open_color`/
@@ -40,23 +42,23 @@ All notable changes to HA SimCard are documented here.
   unchanged.
 * **Raised the limit** from 3 to 10 devices.
 
-## [1.1.1]
+### [1.1.1]
 
 * **Windows**: the Window/Door type toggle now also has Smoke Detector and Leak Sensor
   options. Each type gets its own icon and its own pair of state labels (Open/Closed,
   Smoke/OK, Wet/Dry) instead of always saying Open/Closed.
 
-## [1.1.0]
+### [1.1.0]
 
 * **Windows**: each window now has a Window/Door toggle in the editor. Doors get their own
   icon (`mdi:door-open` / `mdi:door-closed`) and fallback label, everything else (battery,
   actions, colors) works the same as before.
 
-## [1.0.3]
+### [1.0.3]
 
 * **Windows**: raised the limit from 2 to 3 (editor "Add Window" button and config).
 
-## [1.0.2]
+### [1.0.2]
 
 * **Fix**: every free-text field in the editor (room name, window/battery labels, button
   name, color hex value, battery threshold, navigation path / service fields) used
@@ -69,7 +71,7 @@ All notable changes to HA SimCard are documented here.
   side, matching the compact-list look; each row stays small so 2 windows plus several
   battery gauges don't add much height.
 
-## [1.0.1]
+### [1.0.1]
 
 * **Fix**: editing a button/switch (`controls`) entry — name, entity, icon, color, actions —
   silently did nothing whenever the "Windows" section was also expanded in the editor. Both
@@ -84,7 +86,7 @@ All notable changes to HA SimCard are documented here.
 * **Docs**: README example config now uses made-up entity IDs/room instead of a real setup;
   `preview.png` regenerated with fictional data to match.
 
-## [1.0.0]
+### [1.0.0]
 
 Initial release of HA SimCard: a compact, conditional room-overview status card (own custom
 element `ha-simcard`, own file `ha-simcard.js`, own config schema) — installable side by
@@ -108,3 +110,33 @@ side with any other card, no conflicts.
 * Fully GUI-configurable — visual editor with collapsible sections for General, Windows,
   Climate Sensor, Switch Battery, Buttons, and Appearance, each entity's action pair
   editable inline.
+
+## HA Infra: Proxmox
+
+### [1.0.0]
+
+Initial release: a compact Proxmox overview card (own custom element `ha-infra-proxmox`, own
+file `ha-infra-proxmox.js`, own config schema).
+
+* **Nodes** (list, up to 10) — one row each: status icon/text, running container count,
+  running VM count, free memory, optional temperature, all inline instead of a separate row
+  per stat.
+* **Containers/VMs** (list, up to 20) — a grid of toggle tiles below the nodes, same
+  name/icon/state/action shape as HA SimCard's `controls`.
+* Fully GUI-configurable, same visual-editor conventions as HA SimCard (collapsible sections,
+  native always-rendering text fields, scoped per-section list wiring).
+
+## HA Infra: NAS
+
+### [1.0.0]
+
+Initial release: a compact NAS overview card (own custom element `ha-infra-nas`, own file
+`ha-infra-nas.js`, own config schema). One device per card instance, matching HA SimCard's
+one-room-per-card approach.
+
+* **System temperature** (optional) shown in the header.
+* **Drives** (list, up to 12) — one row each, temperature only; turns
+  `temperature_warning_color` (default red) at/above `temperature_warning_threshold`
+  (default 45°) — the inverse of a battery gauge's low-value warning, since heat rising is
+  the problem here.
+* Fully GUI-configurable, same visual-editor conventions as HA SimCard.
