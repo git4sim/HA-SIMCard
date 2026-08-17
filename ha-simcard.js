@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1371,7 +1371,13 @@ function genId() {
 function fmtState(st) {
   if (!st) return "";
   const unit = st.attributes?.unit_of_measurement ? ` ${st.attributes.unit_of_measurement}` : "";
-  return `${st.state}${unit}`;
+  const raw = st.state;
+  const num = raw === "" ? NaN : Number(raw);
+  if (!isNaN(num) && isFinite(num)) {
+    const rounded = Math.round(num * 10) / 10;
+    return `${Object.is(rounded, -0) ? 0 : rounded}${unit}`;
+  }
+  return `${raw}${unit}`;
 }
 
 // =============================================================================

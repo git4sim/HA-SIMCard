@@ -125,6 +125,13 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.1.1]
+
+* **Fix**: numeric sensor values (CPU %, RAM, storage, temperatures, ...) shown in node and
+  container/VM stat pills are now rounded to one decimal place instead of showing the raw
+  sensor value verbatim (e.g. `8.51937846043936 %` → `8.5 %`). Non-numeric states are
+  untouched.
+
 ### [1.1.0]
 
 * **Containers/VMs can be assigned to a node**: each container/VM entry gets an optional
