@@ -1250,13 +1250,14 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 })();
 
 // =============================================================================
+
 // Bundled below: HA Infra: Proxmox (ha-infra-proxmox)
 // =============================================================================
 
 (function () {
   "use strict";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1277,15 +1278,21 @@ const TRANSLATIONS = {
     general: "General",
     nodes: "Nodes", node_add: "Add Node", node_max: "Maximum of 10 nodes",
     status_entity: "Status Sensor", containers_entity: "Containers Running Sensor (optional)",
-    vms_entity: "VMs Running Sensor (optional)", memory_entity: "Free Memory Sensor (optional)",
-    temperature_entity: "Temperature Sensor (optional)",
+    vms_entity: "VMs Running Sensor (optional)", memory_entity: "RAM / Free Memory Sensor (optional)",
+    cpu_entity: "CPU Sensor (optional)", storage_entity: "Storage Sensor (optional)",
+    temperature_entity: "Temperature Sensor (optional, node-level)",
+    drives: "Drives", drive_add: "Add Drive", drive_max: "Maximum of 4 drives per node",
     containers: "Containers / VMs", container_add: "Add Container/VM", container_max: "Maximum of 20 containers/VMs",
+    container_node: "Node (optional)", container_node_none: "— No node (ungrouped) —",
+    ram_entity: "RAM Sensor (optional)",
     appearance: "Appearance", running_color: "Running Color", stopped_color: "Stopped Color",
+    temperature_warning_threshold: "Disk Temperature Warning Threshold (°)", temperature_warning_color: "Disk Temperature Warning Color",
     tap_action: "Tap Action", hold_action: "Hold Action", double_tap_action: "Double Tap Action",
     act_more: "Details (Default)", act_toggle: "Toggle", act_navigate: "Navigate", act_call_service: "Action (service)", act_none: "None",
     nav_path: "Navigation Path", service: "Service (domain.service)", service_data: "Service Data (JSON)",
     show_icon: "Show Icon", delete: "Delete",
     empty_hint: "Nothing configured yet — add a node or a container/VM below.",
+    other_containers: "Other Containers / VMs",
     state_running: "Running", state_stopped: "Stopped", state_unavailable: "Unavailable",
   },
   de: {
@@ -1293,15 +1300,21 @@ const TRANSLATIONS = {
     general: "Allgemein",
     nodes: "Nodes", node_add: "Node hinzufügen", node_max: "Maximal 10 Nodes",
     status_entity: "Status-Sensor", containers_entity: "Container-laufen-Sensor (optional)",
-    vms_entity: "VMs-laufen-Sensor (optional)", memory_entity: "Freier-Speicher-Sensor (optional)",
-    temperature_entity: "Temperatursensor (optional)",
+    vms_entity: "VMs-laufen-Sensor (optional)", memory_entity: "RAM / Freier-Speicher-Sensor (optional)",
+    cpu_entity: "CPU-Sensor (optional)", storage_entity: "Speicherplatz-Sensor (optional)",
+    temperature_entity: "Temperatursensor (optional, Node-Ebene)",
+    drives: "Festplatten", drive_add: "Festplatte hinzufügen", drive_max: "Maximal 4 Festplatten pro Node",
     containers: "Container / VMs", container_add: "Container/VM hinzufügen", container_max: "Maximal 20 Container/VMs",
+    container_node: "Node (optional)", container_node_none: "— Kein Node (nicht gruppiert) —",
+    ram_entity: "RAM-Sensor (optional)",
     appearance: "Darstellung", running_color: "Farbe (läuft)", stopped_color: "Farbe (gestoppt)",
+    temperature_warning_threshold: "Festplatten-Temperaturwarnung Schwelle (°)", temperature_warning_color: "Festplatten-Temperaturwarnung Farbe",
     tap_action: "Antippen", hold_action: "Gedrückt halten", double_tap_action: "Doppelklick",
     act_more: "Details (Standard)", act_toggle: "Umschalten", act_navigate: "Navigieren", act_call_service: "Aktion (Service)", act_none: "Nichts",
     nav_path: "Navigationspfad", service: "Service (domain.service)", service_data: "Service-Daten (JSON)",
     show_icon: "Icon anzeigen", delete: "Löschen",
     empty_hint: "Noch nichts konfiguriert — füge unten einen Node oder ein Container/VM hinzu.",
+    other_containers: "Weitere Container / VMs",
     state_running: "In Betrieb", state_stopped: "Gestoppt", state_unavailable: "Nicht verfügbar",
   }
 };
@@ -1351,8 +1364,14 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function defaultContainerIcon(st) {
-  return isRunning(st) ? "mdi:chip" : "mdi:chip";
+function genId() {
+  return `node_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function fmtState(st) {
+  if (!st) return "";
+  const unit = st.attributes?.unit_of_measurement ? ` ${st.attributes.unit_of_measurement}` : "";
+  return `${st.state}${unit}`;
 }
 
 // =============================================================================
@@ -1413,6 +1432,7 @@ function attachGestures(node, hass, cfg) {
 
 const MAX_NODES = 10;
 const MAX_CONTAINERS = 20;
+const MAX_DRIVES_PER_NODE = 4;
 
 // =============================================================================
 // CARD
@@ -1448,7 +1468,7 @@ class HaInfraProxmox extends HTMLElement {
     const c = this.config || {};
     let size = 1;
     if ((c.nodes || []).length) size += Math.ceil((c.nodes || []).length / 1.5);
-    if ((c.containers || []).length) size += Math.ceil((c.containers || []).length / 3);
+    if ((c.containers || []).length) size += Math.ceil((c.containers || []).length / 2);
     return size;
   }
 
@@ -1466,24 +1486,31 @@ class HaInfraProxmox extends HTMLElement {
         .header { display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px; }
         .header ha-icon { --mdc-icon-size: 22px; color: var(--paper-item-icon-color, var(--state-icon-color, var(--primary-text-color))); flex-shrink: 0; }
         .name { font-size: 15px; font-weight: 700; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .nodes { display: flex; flex-direction: column; gap: 5px; padding: 4px 14px 10px; }
+        .nodes { display: flex; flex-direction: column; gap: 8px; padding: 4px 14px 10px; }
+        .node-block { display: flex; flex-direction: column; gap: 5px; }
         .node-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; cursor: pointer; background: rgba(128,128,128,0.08); flex-wrap: wrap; row-gap: 4px; }
         .node-row:hover { background: rgba(128,128,128,0.14); }
         .node-status-icon { --mdc-icon-size: 20px; flex-shrink: 0; color: var(--node-color, var(--secondary-text-color)); }
         .node-text { display: flex; flex-direction: column; min-width: 0; }
         .node-name { font-size: 13px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .node-state { font-size: 11px; color: var(--node-color, var(--secondary-text-color)); }
-        .node-mini-stats { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+        .node-mini-stats { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; }
         .node-mini-stat { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
-        .node-mini-stat ha-icon { --mdc-icon-size: 14px; color: var(--secondary-text-color); }
+        .node-mini-stat.warn { color: var(--warn-color, #f44336); font-weight: 700; }
+        .node-mini-stat ha-icon { --mdc-icon-size: 14px; color: inherit; }
+        .node-containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 2px 14px; margin-left: 8px; border-left: 2px solid var(--divider-color); }
         .containers { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 14px; }
-        .ctr-tile { flex: 1 1 30%; min-width: 96px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
+        .other-containers-label { font-size: 11px; font-weight: 600; opacity: 0.6; padding: 6px 14px 0; text-transform: uppercase; letter-spacing: 0.03em; }
+        .ctr-tile { flex: 1 1 45%; min-width: 130px; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctr-tile:hover { background: rgba(128,128,128,0.14); }
-        .ctr-tile ha-icon { --mdc-icon-size: 18px; color: var(--ctr-color, var(--secondary-text-color)); flex-shrink: 0; }
+        .ctr-tile ha-icon.ctr-icon { --mdc-icon-size: 18px; color: var(--ctr-color, var(--secondary-text-color)); flex-shrink: 0; margin-top: 1px; }
         .ctr-tile.unavailable { opacity: 0.5; cursor: default; }
-        .ctr-txt { display: flex; flex-direction: column; min-width: 0; }
+        .ctr-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
         .ctr-name { font-size: 12.5px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ctr-state { font-size: 10.5px; color: var(--ctr-color, var(--secondary-text-color)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ctr-mini-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+        .ctr-mini-stat { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--secondary-text-color); white-space: nowrap; }
+        .ctr-mini-stat ha-icon { --mdc-icon-size: 12px; color: inherit; }
         .empty-hint { padding: 16px 14px 18px; font-size: 13px; color: var(--secondary-text-color); }
       </style>
       <ha-card>
@@ -1492,6 +1519,7 @@ class HaInfraProxmox extends HTMLElement {
           <span id="name" class="name"></span>
         </div>
         <div id="nodes" class="nodes"></div>
+        <div id="other-label" class="other-containers-label" hidden></div>
         <div id="containers" class="containers"></div>
         <div id="empty-hint" class="empty-hint" hidden></div>
       </ha-card>
@@ -1502,15 +1530,111 @@ class HaInfraProxmox extends HTMLElement {
     const c = this.config || {};
     const ids = new Set();
     (c.nodes || []).forEach((n) => {
-      [n.status_entity, n.containers_entity, n.vms_entity, n.memory_entity, n.temperature_entity].forEach((e) => e && ids.add(e));
+      [n.status_entity, n.containers_entity, n.vms_entity, n.memory_entity, n.cpu_entity, n.storage_entity, n.temperature_entity].forEach((e) => e && ids.add(e));
+      (n.drives || []).forEach((d) => d.entity && ids.add(d.entity));
     });
-    (c.containers || []).forEach((ctr) => { if (ctr.entity) ids.add(ctr.entity); });
+    (c.containers || []).forEach((ctr) => {
+      [ctr.entity, ctr.cpu_entity, ctr.ram_entity, ctr.storage_entity].forEach((e) => e && ids.add(e));
+    });
     const parts = [];
     ids.forEach((id) => {
       const st = h.states[id];
       parts.push(`${id}:${st ? st.state + "|" + (st.attributes?.friendly_name || "") + "|" + (st.attributes?.unit_of_measurement ?? "") : "x"}`);
     });
     return parts.sort().join(",") + `|${h.language || ""}`;
+  }
+
+  _renderNodeMiniStats(h, n, threshold, warnColor) {
+    const wrap = document.createElement("div");
+    wrap.className = "node-mini-stats";
+    const add = (entity, iconName, opts = {}) => {
+      if (!entity) return;
+      const est = h.states[entity];
+      if (!est || isUnavailable(est)) return;
+      const mini = document.createElement("span");
+      mini.className = "node-mini-stat";
+      if (opts.warnIfAtOrAbove !== undefined) {
+        const num = parseFloat(est.state);
+        if (!isNaN(num) && num >= opts.warnIfAtOrAbove) {
+          mini.classList.add("warn");
+          mini.style.setProperty("--warn-color", warnColor);
+        }
+      }
+      const mIcon = document.createElement("ha-icon");
+      mIcon.icon = iconName;
+      mini.appendChild(mIcon);
+      const label = opts.label ? `${opts.label}: ` : "";
+      mini.appendChild(document.createTextNode(`${label}${fmtState(est)}`));
+      if (opts.title) mini.title = opts.title;
+      wrap.appendChild(mini);
+    };
+    add(n.containers_entity, "mdi:package-variant-closed");
+    add(n.vms_entity, "mdi:monitor");
+    add(n.cpu_entity, "mdi:cpu-64-bit");
+    add(n.memory_entity, "mdi:memory");
+    add(n.storage_entity, "mdi:harddisk");
+    add(n.temperature_entity, "mdi:thermometer", { warnIfAtOrAbove: threshold });
+    (n.drives || []).slice(0, MAX_DRIVES_PER_NODE).forEach((d, i) => {
+      if (!d.entity) return;
+      add(d.entity, "mdi:thermometer", { warnIfAtOrAbove: threshold, label: trimStr(d.label) || `${i + 1}`, title: trimStr(d.label) });
+    });
+    return wrap;
+  }
+
+  _renderContainerTile(h, ctr, runColor, stopColor) {
+    const st = h.states[ctr.entity];
+    const unavailable = isUnavailable(st);
+    const running = !unavailable && isRunning(st);
+    const color = running ? runColor : stopColor;
+    const tile = document.createElement("div");
+    tile.className = `ctr-tile${unavailable ? " unavailable" : ""}`;
+    tile.style.setProperty("--ctr-color", unavailable ? "var(--secondary-text-color)" : color);
+    if (ctr.show_icon !== false) {
+      const icon = document.createElement("ha-icon");
+      icon.className = "ctr-icon";
+      icon.icon = trimStr(ctr.icon) || "mdi:chip";
+      tile.appendChild(icon);
+    }
+    const txt = document.createElement("div");
+    txt.className = "ctr-txt";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "ctr-name";
+    nameSpan.textContent = trimStr(ctr.name) || st?.attributes?.friendly_name || ctr.entity;
+    txt.appendChild(nameSpan);
+    const stateSpan = document.createElement("span");
+    stateSpan.className = "ctr-state";
+    stateSpan.textContent = unavailable ? getTranslation(h, "state_unavailable") : getTranslation(h, running ? "state_running" : "state_stopped");
+    txt.appendChild(stateSpan);
+
+    const miniWrap = document.createElement("div");
+    miniWrap.className = "ctr-mini-stats";
+    const addMini = (entity, iconName) => {
+      if (!entity) return;
+      const est = h.states[entity];
+      if (!est || isUnavailable(est)) return;
+      const mini = document.createElement("span");
+      mini.className = "ctr-mini-stat";
+      const mIcon = document.createElement("ha-icon");
+      mIcon.icon = iconName;
+      mini.appendChild(mIcon);
+      mini.appendChild(document.createTextNode(fmtState(est)));
+      miniWrap.appendChild(mini);
+    };
+    addMini(ctr.cpu_entity, "mdi:cpu-64-bit");
+    addMini(ctr.ram_entity, "mdi:memory");
+    addMini(ctr.storage_entity, "mdi:harddisk");
+    if (miniWrap.children.length) txt.appendChild(miniWrap);
+
+    tile.appendChild(txt);
+    if (!unavailable) {
+      attachGestures(tile, h, {
+        entity: ctr.entity,
+        tap_action: ctr.tap_action || { action: "toggle" },
+        hold_action: ctr.hold_action || { action: "more-info" },
+        double_tap_action: ctr.double_tap_action || { action: "none" }
+      });
+    }
+    return tile;
   }
 
   _update() {
@@ -1524,6 +1648,7 @@ class HaInfraProxmox extends HTMLElement {
     const iconEl = this.shadowRoot.getElementById("icon");
     const nodesEl = this.shadowRoot.getElementById("nodes");
     const containersEl = this.shadowRoot.getElementById("containers");
+    const otherLabelEl = this.shadowRoot.getElementById("other-label");
     const emptyHint = this.shadowRoot.getElementById("empty-hint");
 
     nameEl.textContent = c.name || "Proxmox";
@@ -1531,16 +1656,25 @@ class HaInfraProxmox extends HTMLElement {
 
     const runColor = trimStr(c.running_color) || "#E57000";
     const stopColor = trimStr(c.stopped_color) || "var(--secondary-text-color)";
+    const tempThreshold = Number.isFinite(Number(c.temperature_warning_threshold)) ? Number(c.temperature_warning_threshold) : 45;
+    const tempWarnColor = trimStr(c.temperature_warning_color) || "#f44336";
 
-    // --- Nodes ---
+    const nodes = c.nodes || [];
+    const allContainers = (c.containers || []).slice(0, MAX_CONTAINERS).filter((ctr) => ctr.entity);
+    const groupedIds = new Set();
+
+    // --- Nodes (each with its own grouped container tiles right below) ---
     nodesEl.replaceChildren();
-    (c.nodes || []).forEach((n) => {
+    nodes.forEach((n) => {
       if (!n.status_entity) return;
       const st = h.states[n.status_entity];
       if (!st) return;
       const running = isRunning(st);
       const unavailable = isUnavailable(st);
       const color = unavailable ? "var(--secondary-text-color)" : (running ? runColor : stopColor);
+
+      const block = document.createElement("div");
+      block.className = "node-block";
 
       const row = document.createElement("div");
       row.className = "node-row";
@@ -1563,70 +1697,38 @@ class HaInfraProxmox extends HTMLElement {
       text.appendChild(stateSpan);
       row.appendChild(text);
 
-      const miniStats = document.createElement("div");
-      miniStats.className = "node-mini-stats";
-      const addMini = (entity, iconName) => {
-        if (!entity) return;
-        const est = h.states[entity];
-        if (!est || isUnavailable(est)) return;
-        const mini = document.createElement("span");
-        mini.className = "node-mini-stat";
-        const mIcon = document.createElement("ha-icon");
-        mIcon.icon = iconName;
-        mini.appendChild(mIcon);
-        const unit = est.attributes?.unit_of_measurement ? ` ${est.attributes.unit_of_measurement}` : "";
-        mini.appendChild(document.createTextNode(`${est.state}${unit}`));
-        miniStats.appendChild(mini);
-      };
-      addMini(n.containers_entity, "mdi:package-variant-closed");
-      addMini(n.vms_entity, "mdi:monitor");
-      addMini(n.memory_entity, "mdi:memory");
-      addMini(n.temperature_entity, "mdi:thermometer");
+      const miniStats = this._renderNodeMiniStats(h, n, tempThreshold, tempWarnColor);
       if (miniStats.children.length) row.appendChild(miniStats);
 
       attachGestures(row, h, { entity: n.status_entity, tap_action: n.tap_action, hold_action: n.hold_action });
-      nodesEl.appendChild(row);
+      block.appendChild(row);
+
+      if (n.id) {
+        const own = allContainers.filter((ctr) => ctr.node_id === n.id);
+        if (own.length) {
+          const grid = document.createElement("div");
+          grid.className = "node-containers";
+          own.forEach((ctr) => {
+            groupedIds.add(ctr);
+            grid.appendChild(this._renderContainerTile(h, ctr, runColor, stopColor));
+          });
+          block.appendChild(grid);
+        }
+      }
+
+      nodesEl.appendChild(block);
     });
 
-    // --- Containers / VMs ---
+    // --- Ungrouped containers/VMs ---
+    const nodeIds = new Set(nodes.filter((n) => n.id).map((n) => n.id));
+    const ungrouped = allContainers.filter((ctr) => !groupedIds.has(ctr) && (!ctr.node_id || !nodeIds.has(ctr.node_id)));
     containersEl.replaceChildren();
-    (c.containers || []).slice(0, MAX_CONTAINERS).forEach((ctr) => {
-      if (!ctr.entity) return;
-      const st = h.states[ctr.entity];
-      const unavailable = isUnavailable(st);
-      const running = !unavailable && isRunning(st);
-      const color = running ? runColor : stopColor;
-      const tile = document.createElement("div");
-      tile.className = `ctr-tile${unavailable ? " unavailable" : ""}`;
-      tile.style.setProperty("--ctr-color", unavailable ? "var(--secondary-text-color)" : color);
-      if (ctr.show_icon !== false) {
-        const icon = document.createElement("ha-icon");
-        icon.icon = trimStr(ctr.icon) || defaultContainerIcon(st);
-        tile.appendChild(icon);
-      }
-      const txt = document.createElement("div");
-      txt.className = "ctr-txt";
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "ctr-name";
-      nameSpan.textContent = trimStr(ctr.name) || st?.attributes?.friendly_name || ctr.entity;
-      txt.appendChild(nameSpan);
-      const stateSpan = document.createElement("span");
-      stateSpan.className = "ctr-state";
-      stateSpan.textContent = unavailable ? getTranslation(h, "state_unavailable") : getTranslation(h, running ? "state_running" : "state_stopped");
-      txt.appendChild(stateSpan);
-      tile.appendChild(txt);
-      if (!unavailable) {
-        attachGestures(tile, h, {
-          entity: ctr.entity,
-          tap_action: ctr.tap_action || { action: "toggle" },
-          hold_action: ctr.hold_action || { action: "more-info" },
-          double_tap_action: ctr.double_tap_action || { action: "none" }
-        });
-      }
-      containersEl.appendChild(tile);
-    });
+    ungrouped.forEach((ctr) => containersEl.appendChild(this._renderContainerTile(h, ctr, runColor, stopColor)));
+    const showOtherLabel = ungrouped.length > 0 && groupedIds.size > 0;
+    otherLabelEl.hidden = !showOtherLabel;
+    if (showOtherLabel) otherLabelEl.textContent = getTranslation(h, "other_containers");
 
-    const hasAnything = (c.nodes || []).length > 0 || (c.containers || []).length > 0;
+    const hasAnything = nodes.length > 0 || allContainers.length > 0;
     emptyHint.hidden = hasAnything;
     if (!hasAnything) emptyHint.textContent = getTranslation(h, "empty_hint");
   }
@@ -1713,6 +1815,21 @@ class HaInfraProxmoxEditor extends HTMLElement {
     this._config = next;
     this._lastFiredSig = forceRerender ? null : JSON.stringify(next);
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true }));
+  }
+
+  // Existing configs may have nodes without a stable id (created before
+  // node->container grouping existed). Backfill once so the container
+  // "Node" picker has something durable to reference.
+  _ensureNodeIds() {
+    const nodes = this._config?.nodes;
+    if (!Array.isArray(nodes) || !nodes.length) return;
+    let changed = false;
+    const next = nodes.map((n) => {
+      if (n.id) return n;
+      changed = true;
+      return { ...n, id: genId() };
+    });
+    if (changed) this._fire({ ...this._config, nodes: next }, true);
   }
 
   _wireActionField(root, cls, actionCfg, onChange) {
@@ -1815,6 +1932,62 @@ class HaInfraProxmoxEditor extends HTMLElement {
     this._wireIconPicker(root, ".icon-f", c.icon, (v) => this._fire({ ...this._config, icon: v }));
   }
 
+  _nodeDrivesHTML(h, n, nodeIdx) {
+    const drives = Array.isArray(n.drives) ? n.drives : [];
+    const rows = drives.map((d, di) => `
+      <div class="drive-row" data-drive-idx="${di}">
+        <ha-entity-picker class="drive-entity" label="${escAttr(getTranslation(h, "entity"))}" style="flex:1;min-width:0;display:block;"></ha-entity-picker>
+        <input type="text" class="native-text drive-label" placeholder="${escAttr(getTranslation(h, "label"))}" value="${escAttr(d.label)}" style="width:110px;flex-shrink:0;">
+        <button type="button" class="del-btn drive-del" data-del>${DELETE_ICON}</button>
+      </div>
+    `).join("");
+    const addDisabled = drives.length >= MAX_DRIVES_PER_NODE;
+    return `
+      <div class="node-drives" data-node-idx="${nodeIdx}">
+        <label class="native-label">${escAttr(getTranslation(h, "drives"))}</label>
+        <div class="drive-list">${rows}</div>
+        <button type="button" class="add-btn add-drive-btn" style="margin-top:4px;"${addDisabled ? " disabled" : ""}>${PLUS_ICON}${escAttr(getTranslation(h, "drive_add"))}</button>
+        ${addDisabled ? `<div class="hint">${escAttr(getTranslation(h, "drive_max"))}</div>` : ""}
+      </div>
+    `;
+  }
+
+  _wireNodeDrives(box, h, n, nodeIdx, updNode) {
+    const wrap = box.querySelector(".node-drives");
+    if (!wrap) return;
+    const drives = Array.isArray(n.drives) ? n.drives : [];
+    wrap.querySelectorAll(".drive-row").forEach((row) => {
+      const di = Number(row.getAttribute("data-drive-idx"));
+      const d = drives[di] || {};
+      this._wireEntityPicker(row, ".drive-entity", d.entity, ["sensor"], (v) => {
+        const arr = [...(this._config.nodes[nodeIdx].drives || [])];
+        arr[di] = { ...arr[di], entity: v };
+        updNode({ drives: arr }, true);
+      });
+      const labelInput = row.querySelector(".drive-label");
+      if (labelInput) {
+        labelInput.addEventListener("change", (e) => {
+          e.stopPropagation();
+          const arr = [...(this._config.nodes[nodeIdx].drives || [])];
+          arr[di] = { ...arr[di], label: e.target.value };
+          updNode({ drives: arr }, true);
+        });
+      }
+      row.querySelector("[data-del]")?.addEventListener("click", () => {
+        const arr = [...(this._config.nodes[nodeIdx].drives || [])];
+        arr.splice(di, 1);
+        updNode({ drives: arr }, true);
+      });
+    });
+    const addBtn = wrap.querySelector(".add-drive-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", () => {
+        if (drives.length >= MAX_DRIVES_PER_NODE) return;
+        updNode({ drives: [...drives, { entity: "" }] }, true);
+      });
+    }
+  }
+
   _nodeItemHTML(h, n, idx) {
     return `
       <div class="item-box" data-idx="${idx}">
@@ -1826,8 +1999,11 @@ class HaInfraProxmoxEditor extends HTMLElement {
         <ha-entity-picker class="node-status" label="${escAttr(getTranslation(h, "status_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="node-containers" label="${escAttr(getTranslation(h, "containers_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="node-vms" label="${escAttr(getTranslation(h, "vms_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-entity-picker class="node-cpu" label="${escAttr(getTranslation(h, "cpu_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="node-memory" label="${escAttr(getTranslation(h, "memory_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-entity-picker class="node-storage" label="${escAttr(getTranslation(h, "storage_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         <ha-entity-picker class="node-temp" label="${escAttr(getTranslation(h, "temperature_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        ${this._nodeDrivesHTML(h, n, idx)}
         ${actionFieldHTML(h, "node-tap", getTranslation(h, "tap_action"), n.tap_action)}
         ${actionFieldHTML(h, "node-hold", getTranslation(h, "hold_action"), n.hold_action)}
       </div>
@@ -1857,18 +2033,29 @@ class HaInfraProxmoxEditor extends HTMLElement {
         this._fire({ ...this._config, nodes: arr }, force);
       };
       box.querySelector("[data-del]")?.addEventListener("click", () => {
+        const removed = (this._config?.nodes || [])[idx];
         const arr = [...(this._config?.nodes || [])];
         arr.splice(idx, 1);
         const next = { ...this._config };
         if (arr.length) next.nodes = arr; else delete next.nodes;
+        // Unassign any containers pointing at the deleted node so they fall
+        // back to the ungrouped section instead of vanishing silently.
+        if (removed?.id && Array.isArray(next.containers)) {
+          next.containers = next.containers.map((ctr) =>
+            ctr.node_id === removed.id ? { ...ctr, node_id: "" } : ctr
+          );
+        }
         this._fire(next, true);
       });
       this._wireTextField(box, ".node-name", n.name, (v) => upd({ name: v }, true));
       this._wireEntityPicker(box, ".node-status", n.status_entity, ["binary_sensor", "sensor"], (v) => upd({ status_entity: v }, true));
       this._wireEntityPicker(box, ".node-containers", n.containers_entity, ["sensor"], (v) => upd({ containers_entity: v }));
       this._wireEntityPicker(box, ".node-vms", n.vms_entity, ["sensor"], (v) => upd({ vms_entity: v }));
+      this._wireEntityPicker(box, ".node-cpu", n.cpu_entity, ["sensor"], (v) => upd({ cpu_entity: v }));
       this._wireEntityPicker(box, ".node-memory", n.memory_entity, ["sensor"], (v) => upd({ memory_entity: v }));
+      this._wireEntityPicker(box, ".node-storage", n.storage_entity, ["sensor"], (v) => upd({ storage_entity: v }));
       this._wireEntityPicker(box, ".node-temp", n.temperature_entity, ["sensor"], (v) => upd({ temperature_entity: v }));
+      this._wireNodeDrives(box, h, n, idx, upd);
       this._wireActionField(box, "node-tap", n.tap_action, (v) => upd({ tap_action: v }));
       this._wireActionField(box, "node-hold", n.hold_action, (v) => upd({ hold_action: v }));
     });
@@ -1877,12 +2064,15 @@ class HaInfraProxmoxEditor extends HTMLElement {
       addBtn.addEventListener("click", () => {
         if (nodes.length >= MAX_NODES) return;
         this._openSections.nodes = true;
-        this._fire({ ...this._config, nodes: [...nodes, { status_entity: "" }] }, true);
+        this._fire({ ...this._config, nodes: [...nodes, { id: genId(), status_entity: "" }] }, true);
       });
     }
   }
 
-  _containerItemHTML(h, ctr, idx) {
+  _containerItemHTML(h, ctr, idx, nodes) {
+    const nodeOpts = [`<option value=""${!ctr.node_id ? " selected" : ""}>${escAttr(getTranslation(h, "container_node_none"))}</option>`]
+      .concat(nodes.map((n) => `<option value="${escAttr(n.id)}"${ctr.node_id === n.id ? " selected" : ""}>${escAttr(n.name) || escAttr(n.status_entity) || "?"}</option>`))
+      .join("");
     return `
       <div class="item-box" data-idx="${idx}">
         <div class="item-head">
@@ -1895,6 +2085,13 @@ class HaInfraProxmoxEditor extends HTMLElement {
         <ha-formfield label="${escAttr(getTranslation(h, "show_icon"))}">
           <ha-switch class="ctr-show-icon"${ctr.show_icon !== false ? " checked" : ""}></ha-switch>
         </ha-formfield>
+        <div class="tf">
+          <label class="native-label">${escAttr(getTranslation(h, "container_node"))}</label>
+          <select class="native-select ctr-node">${nodeOpts}</select>
+        </div>
+        <ha-entity-picker class="ctr-cpu" label="${escAttr(getTranslation(h, "cpu_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-entity-picker class="ctr-ram" label="${escAttr(getTranslation(h, "ram_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
+        <ha-entity-picker class="ctr-storage" label="${escAttr(getTranslation(h, "storage_entity"))}" style="width:100%;display:block;margin-bottom:8px;"></ha-entity-picker>
         ${actionFieldHTML(h, "ctr-tap", getTranslation(h, "tap_action"), ctr.tap_action)}
         ${actionFieldHTML(h, "ctr-hold", getTranslation(h, "hold_action"), ctr.hold_action)}
         ${actionFieldHTML(h, "ctr-dbl", getTranslation(h, "double_tap_action"), ctr.double_tap_action)}
@@ -1904,7 +2101,8 @@ class HaInfraProxmoxEditor extends HTMLElement {
 
   _containersHTML(h, c) {
     const containers = Array.isArray(c.containers) ? c.containers : [];
-    const items = containers.map((ctr, i) => this._containerItemHTML(h, ctr, i)).join("");
+    const nodes = Array.isArray(c.nodes) ? c.nodes.filter((n) => n.id) : [];
+    const items = containers.map((ctr, i) => this._containerItemHTML(h, ctr, i, nodes)).join("");
     const addDisabled = containers.length >= MAX_CONTAINERS;
     return `
       <div class="item-list">${items}</div>
@@ -1932,10 +2130,15 @@ class HaInfraProxmoxEditor extends HTMLElement {
         this._fire(next, true);
       });
       this._wireEntityPicker(box, ".ctr-entity", ctr.entity, ["switch", "binary_sensor", "sensor"], (v) => upd({ entity: v }, true));
-      this._wireTextField(box, ".ctr-name", ctr.name, (v) => upd({ name: v }));
+      this._wireTextField(box, ".ctr-name", ctr.name, (v) => upd({ name: v }, true));
       this._wireIconPicker(box, ".ctr-icon", ctr.icon, (v) => upd({ icon: v }));
       const showIconSw = box.querySelector(".ctr-show-icon");
       if (showIconSw) showIconSw.addEventListener("change", (e) => { e.stopPropagation(); upd({ show_icon: e.target.checked }); });
+      const nodeSel = box.querySelector(".ctr-node");
+      if (nodeSel) nodeSel.addEventListener("change", (e) => { e.stopPropagation(); upd({ node_id: e.target.value }, true); });
+      this._wireEntityPicker(box, ".ctr-cpu", ctr.cpu_entity, ["sensor"], (v) => upd({ cpu_entity: v }));
+      this._wireEntityPicker(box, ".ctr-ram", ctr.ram_entity, ["sensor"], (v) => upd({ ram_entity: v }));
+      this._wireEntityPicker(box, ".ctr-storage", ctr.storage_entity, ["sensor"], (v) => upd({ storage_entity: v }));
       this._wireActionField(box, "ctr-tap", ctr.tap_action, (v) => upd({ tap_action: v }));
       this._wireActionField(box, "ctr-hold", ctr.hold_action, (v) => upd({ hold_action: v }));
       this._wireActionField(box, "ctr-dbl", ctr.double_tap_action, (v) => upd({ double_tap_action: v }));
@@ -1954,12 +2157,19 @@ class HaInfraProxmoxEditor extends HTMLElement {
     return `
       ${this._colorFieldHTML("app-run-color", getTranslation(h, "running_color"), c.running_color, "#E57000")}
       ${this._colorFieldHTML("app-stop-color", getTranslation(h, "stopped_color"), c.stopped_color, "#9b9b9b")}
+      ${textFieldHTML("app-threshold", getTranslation(h, "temperature_warning_threshold"), c.temperature_warning_threshold ?? "45", { type: "number" })}
+      ${this._colorFieldHTML("app-warn-color", getTranslation(h, "temperature_warning_color"), c.temperature_warning_color, "#f44336")}
     `;
   }
 
   _wireAppearance(root, h, c) {
     this._wireColorField(root, ".app-run-color", c.running_color, "#E57000", (v) => this._fire({ ...this._config, running_color: v }));
     this._wireColorField(root, ".app-stop-color", c.stopped_color, "#9b9b9b", (v) => this._fire({ ...this._config, stopped_color: v }));
+    this._wireTextField(root, ".app-threshold", c.temperature_warning_threshold ?? "45", (v) => {
+      const num = v === "" ? 45 : Number(v);
+      this._fire({ ...this._config, temperature_warning_threshold: Number.isFinite(num) ? num : 45 });
+    });
+    this._wireColorField(root, ".app-warn-color", c.temperature_warning_color, "#f44336", (v) => this._fire({ ...this._config, temperature_warning_color: v }));
   }
 
   _sectionHTML(id, titleKey, bodyHTML) {
@@ -1979,6 +2189,7 @@ class HaInfraProxmoxEditor extends HTMLElement {
   _render() {
     if (!this._hass) return;
     this._rendered = true;
+    this._ensureNodeIds();
     const h = this._hass;
     const c = this._config || {};
 
@@ -1996,7 +2207,7 @@ class HaInfraProxmoxEditor extends HTMLElement {
         .item-box { border: 1px solid var(--divider-color); border-radius: 8px; padding: 10px; background: var(--card-background-color, var(--primary-background-color)); display: flex; flex-direction: column; gap: 8px; }
         .item-head { display: flex; align-items: center; justify-content: space-between; }
         .item-title { font-size: 12px; font-weight: 600; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .del-btn { background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; color: #d32f2f; }
+        .del-btn { background: none; border: 0; cursor: pointer; padding: 2px; display: inline-flex; color: #d32f2f; flex-shrink: 0; }
         .del-btn ha-icon, .del-btn svg { --mdc-icon-size: 18px; width: 18px; height: 18px; }
         .hint { font-size: 11px; opacity: 0.6; }
         .native-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.75; margin-bottom: 4px; }
@@ -2010,6 +2221,9 @@ class HaInfraProxmoxEditor extends HTMLElement {
         .color-swatch { width: 40px; height: 40px; border: 1px solid var(--divider-color); border-radius: 8px; padding: 3px; cursor: pointer; flex-shrink: 0; background: var(--card-background-color, var(--primary-background-color)); box-sizing: border-box; }
         .add-btn { display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 8px; border: none; background: var(--primary-color, #E57000); color: var(--text-primary-color, #fff); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
         .add-btn:disabled { opacity: 0.5; cursor: default; }
+        .node-drives { border-top: 1px dashed var(--divider-color); padding-top: 8px; margin-top: 2px; }
+        .drive-list { display: flex; flex-direction: column; gap: 6px; }
+        .drive-row { display: flex; gap: 6px; align-items: center; }
       </style>
       <div class="wrap">
         ${this._sectionHTML("general", "general", this._generalHTML(h, c))}
@@ -2046,14 +2260,13 @@ if (!window.customCards.some((c) => c.type === "ha-infra-proxmox")) {
   window.customCards.push({
     type: "ha-infra-proxmox",
     name: "HA Infra: Proxmox",
-    description: "A compact Proxmox overview card: nodes (status/containers/VMs/memory/temperature) and a grid of container/VM toggle tiles.",
+    description: "A compact Proxmox overview card: nodes (status/containers/VMs/CPU/RAM/storage/disk temps) with their container/VM tiles grouped underneath.",
     preview: true
   });
 }
 
 })();
 
-// =============================================================================
 // Bundled below: HA Infra: NAS (ha-infra-nas)
 // =============================================================================
 

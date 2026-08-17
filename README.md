@@ -199,9 +199,11 @@ smoke_closed_color: "#4CAF50"
 
 ![Preview](preview-proxmox.png)
 
-A compact Proxmox overview card: one row per node (status, running containers, running VMs,
-free memory, optional temperature) and a grid of container/VM toggle tiles below — instead of
-one long list with a separate row per stat per node.
+A compact Proxmox overview card: one row per node (status, running containers/VMs, CPU, RAM,
+storage, and per-disk temperatures) with that node's container/VM tiles — each showing its
+own CPU/RAM/storage — grouped directly underneath it. Containers/VMs not assigned to any
+node show in a flat section at the end (and if you don't assign any container to a node at
+all, the card looks exactly like a single flat grid — the grouping is opt-in per container).
 
 ### Installation
 
@@ -219,6 +221,8 @@ above). If you already have HA SimCard's resource added, just add the card via
 | `icon` | `mdi:server` | Header icon |
 | `running_color` | `#E57000` | Status icon / tile color when running |
 | `stopped_color` | `#9b9b9b` | Status icon / tile color when stopped |
+| `temperature_warning_threshold` | `45` | Disk/node temperatures at/above this value turn red |
+| `temperature_warning_color` | `#f44336` | That warning color |
 
 #### `nodes` (list, up to 10 entries)
 
@@ -228,11 +232,14 @@ above). If you already have HA SimCard's resource added, just add the card via
 | `status_entity` | `binary_sensor` (or `sensor`) — on/`running` = node up |
 | `containers_entity` | Optional `sensor` — running container count |
 | `vms_entity` | Optional `sensor` — running VM count |
-| `memory_entity` | Optional `sensor` — free memory (shown with its own unit) |
-| `temperature_entity` | Optional `sensor` — node temperature |
+| `cpu_entity` | Optional `sensor` — node CPU usage |
+| `memory_entity` | Optional `sensor` — RAM/free memory (shown with its own unit) |
+| `storage_entity` | Optional `sensor` — node storage usage |
+| `temperature_entity` | Optional `sensor` — a single node-level temperature, if your setup exposes one |
+| `drives` (list, up to 4) | Per-disk temperature sensors — each entry is `entity` (`sensor`) + `label` (e.g. "Disk 1"). Most Proxmox setups don't expose a node temperature via Home Assistant at all; this is the practical alternative — point it at your SMART/disk-temperature sensors instead. Colored via the card-level warning threshold, same as the NAS card. |
 | `tap_action` / `hold_action` | Action on the node row |
 
-#### `containers` (list, up to 20 entries) — container/VM toggle tiles
+#### `containers` (list, up to 20 entries) — container/VM tiles
 
 | Option | Default | Description |
 |---|---|---|
@@ -240,12 +247,21 @@ above). If you already have HA SimCard's resource added, just add the card via
 | `name` | friendly name | Tile label |
 | `icon` | `mdi:chip` | Icon override |
 | `show_icon` | `true` | Show/hide the icon |
+| `node_id` (editor: a dropdown of your configured nodes) | ungrouped | Which node this container/VM renders under (matches a node's internal `id`). Leave unset to keep it in the flat, ungrouped section. |
+| `cpu_entity` | — | Optional `sensor` — this container/VM's CPU usage |
+| `ram_entity` | — | Optional `sensor` — this container/VM's RAM usage |
+| `storage_entity` | — | Optional `sensor` — this container/VM's storage usage |
 | `tap_action` | `toggle` | Tap action |
 | `hold_action` | `more-info` | Hold action |
 | `double_tap_action` | `none` | Double-tap action |
 
 Actions accept the same `more-info` · `toggle` · `navigate` · `call-service` · `none` as HA
 SimCard.
+
+> The editor's node dropdown references nodes by a stable internal ID, not by name — assigned
+> containers stay correctly grouped even if you rename a node afterward. Deleting a node
+> un-assigns (doesn't delete) any containers that pointed at it; they fall back to the
+> ungrouped section instead of disappearing.
 
 ### Example YAML
 
@@ -255,29 +271,45 @@ name: Proxmox
 icon: mdi:server
 
 nodes:
-  - name: Node pve1
+  - id: node_pve1
+    name: Node pve1
     status_entity: binary_sensor.pve1_status
     containers_entity: sensor.pve1_containers_running
     vms_entity: sensor.pve1_vms_running
+    cpu_entity: sensor.pve1_cpu_usage
     memory_entity: sensor.pve1_memory_free
-    temperature_entity: sensor.pve1_temperature
-  - name: Node pve2
+    storage_entity: sensor.pve1_storage_used
+    drives:
+      - entity: sensor.pve1_disk1_temperature
+        label: Disk 1
+      - entity: sensor.pve1_disk2_temperature
+        label: Disk 2
+  - id: node_pve2
+    name: Node pve2
     status_entity: binary_sensor.pve2_status
-    containers_entity: sensor.pve2_containers_running
-    vms_entity: sensor.pve2_vms_running
+    cpu_entity: sensor.pve2_cpu_usage
     memory_entity: sensor.pve2_memory_free
 
 containers:
   - entity: switch.pihole1
     name: Pihole1
+    node_id: node_pve1
+    cpu_entity: sensor.pihole1_cpu
+    ram_entity: sensor.pihole1_ram
+    storage_entity: sensor.pihole1_storage
   - entity: switch.certbot
     name: Certbot
+    node_id: node_pve1
   - entity: switch.nextcloud
     name: Nextcloud
+
+temperature_warning_threshold: 45
+temperature_warning_color: "#f44336"
 ```
 
 > Not built for per-stat drill-down: tapping a node row targets its `status_entity` only, not
-> the individual container/VM/memory/temperature sensors next to it.
+> the individual container/VM/CPU/RAM/storage/disk sensors next to it. Same for container/VM
+> tiles — the tap/hold/double-tap actions target the tile's own `entity`.
 
 ---
 

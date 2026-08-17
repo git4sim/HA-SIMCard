@@ -125,6 +125,25 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.1.0]
+
+* **Containers/VMs can be assigned to a node**: each container/VM entry gets an optional
+  `node_id` (editor: a "Node" dropdown listing your configured nodes). Assigned ones render
+  grouped directly under their node instead of in the flat grid; anything left unassigned
+  still renders in that flat grid exactly as before — existing configs are unaffected.
+  Deleting a node un-assigns (never deletes) any containers pointing at it.
+* **Per-container/VM CPU, RAM, storage**: three new optional sensors (`cpu_entity`,
+  `ram_entity`, `storage_entity`) shown as small stat pills inside each tile.
+* **Per-node CPU and storage**: two new optional sensors (`cpu_entity`, `storage_entity`)
+  alongside the existing `memory_entity`, shown in the node's stat row.
+* **Per-node disk temperatures**: a new `drives` list (up to 4 per node, each an `entity` +
+  `label`) for setups where Home Assistant has no node-level temperature sensor at all but
+  does have SMART/disk-temperature sensors — the common case for Proxmox. Same
+  at/above-threshold red-warning behavior as HA Infra: NAS's drives, via two new card-level
+  options: `temperature_warning_threshold` (default 45°) and `temperature_warning_color`.
+  The existing single `temperature_entity` per node still works for setups that do have one.
+* Tiles widened (2 per row instead of 3) to fit the new per-container stats.
+
 ### [1.0.0]
 
 Initial release: a compact Proxmox overview card (own custom element `ha-infra-proxmox`, own
