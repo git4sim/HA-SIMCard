@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.2.1";
+const VERSION = "1.2.2";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1528,9 +1528,9 @@ class HaInfraProxmox extends HTMLElement {
         .ctr-status-badge.is-running { background: #4CAF50; }
         .ctr-status-badge.is-stopped { background: #f44336; }
         .ctr-status-badge.is-unavailable { background: #FFA000; }
-        .ctr-mini-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-        .ctr-mini-stat { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--secondary-text-color); white-space: nowrap; }
-        .ctr-mini-stat ha-icon { --mdc-icon-size: 12px; color: inherit; }
+        .ctr-mini-stats { display: flex; flex-wrap: nowrap; gap: 5px; margin-top: 2px; }
+        .ctr-mini-stat { display: flex; align-items: center; gap: 2px; font-size: 10px; color: var(--secondary-text-color); white-space: nowrap; min-width: 0; }
+        .ctr-mini-stat ha-icon { --mdc-icon-size: 12px; color: inherit; flex-shrink: 0; }
         .empty-hint { padding: 16px 14px 18px; font-size: 13px; color: var(--secondary-text-color); }
       </style>
       <ha-card>

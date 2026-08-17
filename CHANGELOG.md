@@ -125,6 +125,14 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.2.2]
+
+* **Fix**: a container/VM tile's CPU/RAM/storage stats row (`flex-wrap: wrap`) sat close
+  enough to its own width limit that some tiles wrapped onto two lines and others didn't,
+  depending on the exact digit widths of that tile's values — inconsistent between tiles
+  showing the same three stats. Row no longer wraps at all (`flex-wrap: nowrap`); it reliably
+  fits on one line for every tile now.
+
 ### [1.2.1]
 
 * **Tiles back to 2 per row** (`flex-basis` 31% → 46%): 3 per row left an odd item count's
