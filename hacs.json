@@ -1,5 +1,6 @@
 {
   "name": "HA SimCard",
   "render_readme": true,
-  "filename": "ha-simcard.js"
+  "filename": "ha-simcard.js",
+  "content_in_root": true
 }
