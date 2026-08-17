@@ -1,8 +1,20 @@
 # Changelog
 
-This repository hosts three independent cards, each with its own version history below.
+This repository hosts three independent cards, each with its own version history below. All
+three ship bundled in the single `ha-simcard.js` file (see the note under HA SimCard
+[1.6.0]) — HACS's "plugin" category only auto-tracks one file per repository, so this is
+what makes HA Infra: Proxmox and HA Infra: NAS actually get installed via HACS.
 
 ## HA SimCard
+
+### [1.6.0]
+
+* **Bundled with HA Infra: Proxmox and HA Infra: NAS**: both cards' code now ships inside
+  `ha-simcard.js` instead of their own separate files. Installing/updating the one
+  `ha-simcard.js` resource is enough to get all three cards; no extra Lovelace resources
+  needed. Each card is still wrapped in its own scope (own custom element, own config
+  schema, own translations) — bundling them doesn't change how any of the three behave or
+  are configured, only how the file is distributed.
 
 ### [1.5.0]
 
@@ -116,7 +128,7 @@ side with any other card, no conflicts.
 ### [1.0.0]
 
 Initial release: a compact Proxmox overview card (own custom element `ha-infra-proxmox`, own
-file `ha-infra-proxmox.js`, own config schema).
+config schema; ships bundled inside `ha-simcard.js` — see [1.6.0] above).
 
 * **Nodes** (list, up to 10) — one row each: status icon/text, running container count,
   running VM count, free memory, optional temperature, all inline instead of a separate row
@@ -130,9 +142,9 @@ file `ha-infra-proxmox.js`, own config schema).
 
 ### [1.0.0]
 
-Initial release: a compact NAS overview card (own custom element `ha-infra-nas`, own file
-`ha-infra-nas.js`, own config schema). One device per card instance, matching HA SimCard's
-one-room-per-card approach.
+Initial release: a compact NAS overview card (own custom element `ha-infra-nas`, own config
+schema; ships bundled inside `ha-simcard.js` — see [1.6.0] above under HA SimCard). One
+device per card instance, matching HA SimCard's one-room-per-card approach.
 
 * **System temperature** (optional) shown in the header.
 * **Drives** (list, up to 12) — one row each, temperature only; turns

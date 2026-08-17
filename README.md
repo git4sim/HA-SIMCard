@@ -13,15 +13,18 @@ detectors, leak sensors, a temperature/humidity sensor, a switch battery, and up
 
 > HA SimCard is an independent card, not an update to or dependency of any other room card —
 > install it alongside other Lovelace cards without conflicts (own custom element name,
-> own file, own config schema). It's built around a single job: a clean, conditional
-> per-room status card. Image backgrounds, climate-device integration, and cover/shutter
-> position controls have been removed entirely — this card is not a general-purpose
-> dashboard tile.
+> own config schema). It's built around a single job: a clean, conditional per-room status
+> card. Image backgrounds, climate-device integration, and cover/shutter position controls
+> have been removed entirely — this card is not a general-purpose dashboard tile.
 
-This repository also includes two standalone infrastructure cards, each its own custom
-element/file/config schema, installable independently of HA SimCard and of each other:
+This repository also includes two standalone infrastructure cards — own custom element name,
+own config schema, usable independently of HA SimCard and of each other:
 **[HA Infra: Proxmox](#-ha-infra-proxmox)** (nodes + container/VM tiles) and
-**[HA Infra: NAS](#-ha-infra-nas)** (one device's drive temperatures per card).
+**[HA Infra: NAS](#-ha-infra-nas)** (one device's drive temperatures per card). All three ship
+in the single `ha-simcard.js` file — one download, one Lovelace resource, no extra install
+steps to get all three cards. (HACS's "plugin" category only auto-tracks one file per
+repository, so bundling them together is what makes both new cards actually show up via
+HACS instead of silently never being downloaded.)
 
 ---
 
@@ -202,12 +205,9 @@ one long list with a separate row per stat per node.
 
 ### Installation
 
-Same repository, separate file/resource:
-1. Download `ha-infra-proxmox.js` from the repository (HACS installs it alongside
-   `ha-simcard.js` automatically once this repo is added; manual installs need the file
-   copied into `/config/www/` themselves).
-2. Add a resource: URL `/local/ha-infra-proxmox.js` · Type: JavaScript Module.
-3. Add the card via **"Add Card"** → **HA Infra: Proxmox**.
+No separate install step — it's part of `ha-simcard.js` (see [Installation](#-installation)
+above). If you already have HA SimCard's resource added, just add the card via
+**"Add Card"** → **HA Infra: Proxmox**.
 
 ### Configuration
 
@@ -291,9 +291,9 @@ Any drive at/above the warning threshold turns red.
 
 ### Installation
 
-1. Download `ha-infra-nas.js` from the repository (see note above on HACS vs. manual).
-2. Add a resource: URL `/local/ha-infra-nas.js` · Type: JavaScript Module.
-3. Add the card via **"Add Card"** → **HA Infra: NAS**.
+No separate install step — it's part of `ha-simcard.js` (see [Installation](#-installation)
+above). If you already have HA SimCard's resource added, just add the card via
+**"Add Card"** → **HA Infra: NAS**.
 
 ### Configuration
 
