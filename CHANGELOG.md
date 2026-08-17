@@ -125,6 +125,13 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.2.1]
+
+* **Tiles back to 2 per row** (`flex-basis` 31% → 46%): 3 per row left an odd item count's
+  last row half-empty and forced the CPU/RAM/storage stats onto 3 stacked lines per tile
+  instead of fitting comfortably; 2 per row divides evenly far more often (most node's
+  container/VM counts are even) and reads as a consistent grid instead of a mixed one.
+
 ### [1.2.0]
 
 * **Container/VM tiles redesigned**: the "In Betrieb"/"Gestoppt"/"Nicht verfügbar" state text

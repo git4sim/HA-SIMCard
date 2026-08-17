@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1516,7 +1516,7 @@ class HaInfraProxmox extends HTMLElement {
         .node-containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 4px 2px 14px; margin-left: 8px; border-left: 2px solid var(--divider-color); }
         .containers { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 14px; }
         .other-containers-label { font-size: 11px; font-weight: 600; opacity: 0.6; padding: 6px 14px 0; text-transform: uppercase; letter-spacing: 0.03em; }
-        .ctr-tile { flex: 1 1 31%; min-width: 108px; display: flex; align-items: flex-start; gap: 6px; padding: 8px 9px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
+        .ctr-tile { flex: 1 1 46%; min-width: 130px; display: flex; align-items: flex-start; gap: 6px; padding: 8px 9px; border-radius: 12px; cursor: pointer; background: rgba(128,128,128,0.08); transition: background 0.15s; box-sizing: border-box; }
         .ctr-tile:hover { background: rgba(128,128,128,0.14); }
         .ctr-tile ha-icon.ctr-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); flex-shrink: 0; margin-top: 1px; }
         .ctr-tile.unavailable { opacity: 0.6; cursor: default; }
