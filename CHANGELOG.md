@@ -125,6 +125,15 @@ side with any other card, no conflicts.
 
 ## HA Infra: Proxmox
 
+### [1.1.3]
+
+* **Node stat layout**: general stats (containers/VMs/CPU/RAM/storage) and per-disk
+  temperatures now render as two separate right-aligned lines — general stats next to the
+  node name, disk temperatures next to the status text below it — instead of all of them
+  wrapping together into one crowded line. Uses the vertical space next to the name/status
+  that was previously empty, and gives disk labels (which tend to be longer, e.g. actual
+  disk model names) their own row instead of competing with the shorter stats for space.
+
 ### [1.1.2]
 
 * **Fix**: a node's disk-temperature pills (from `drives`) could overflow past the edge of

@@ -1257,7 +1257,7 @@ if (!window.customCards.some((c) => c.type === "ha-simcard")) {
 (function () {
   "use strict";
 
-const VERSION = "1.1.2";
+const VERSION = "1.1.3";
 const LOG_FLAG = `customCards_HaInfraProxmox_Logged_${VERSION}`;
 
 if (!window[LOG_FLAG]) {
@@ -1506,7 +1506,8 @@ class HaInfraProxmox extends HTMLElement {
         .node-text { display: flex; flex-direction: column; min-width: 0; }
         .node-name { font-size: 13px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .node-state { font-size: 11px; color: var(--node-color, var(--secondary-text-color)); }
-        .node-mini-stats { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; }
+        .node-stats-col { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-left: auto; flex-shrink: 0; }
+        .node-mini-stats { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; justify-content: flex-end; }
         .node-mini-stat { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; max-width: 100%; }
         .node-mini-stat.warn { color: var(--warn-color, #f44336); font-weight: 700; }
         .node-mini-stat ha-icon { --mdc-icon-size: 14px; color: inherit; flex-shrink: 0; }
@@ -1558,48 +1559,59 @@ class HaInfraProxmox extends HTMLElement {
     return parts.sort().join(",") + `|${h.language || ""}`;
   }
 
-  _renderNodeMiniStats(h, n, threshold, warnColor) {
+  _addMiniStat(h, wrap, entity, iconName, threshold, warnColor, opts = {}) {
+    if (!entity) return;
+    const est = h.states[entity];
+    if (!est || isUnavailable(est)) return;
+    const mini = document.createElement("span");
+    mini.className = "node-mini-stat";
+    if (opts.warnIfAtOrAbove !== undefined) {
+      const num = parseFloat(est.state);
+      if (!isNaN(num) && num >= opts.warnIfAtOrAbove) {
+        mini.classList.add("warn");
+        mini.style.setProperty("--warn-color", warnColor);
+      }
+    }
+    const mIcon = document.createElement("ha-icon");
+    mIcon.icon = iconName;
+    mini.appendChild(mIcon);
+    if (opts.label) {
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "node-mini-stat-label";
+      labelSpan.textContent = `${opts.label}:`;
+      mini.appendChild(labelSpan);
+    }
+    const valueSpan = document.createElement("span");
+    valueSpan.className = "node-mini-stat-value";
+    valueSpan.textContent = fmtState(est);
+    mini.appendChild(valueSpan);
+    mini.title = opts.title || (opts.label ? `${opts.label}: ${fmtState(est)}` : "");
+    wrap.appendChild(mini);
+  }
+
+  // Top line: counts + load stats, rendered next to the node name.
+  _renderNodeGeneralStats(h, n, threshold, warnColor) {
     const wrap = document.createElement("div");
     wrap.className = "node-mini-stats";
-    const add = (entity, iconName, opts = {}) => {
-      if (!entity) return;
-      const est = h.states[entity];
-      if (!est || isUnavailable(est)) return;
-      const mini = document.createElement("span");
-      mini.className = "node-mini-stat";
-      if (opts.warnIfAtOrAbove !== undefined) {
-        const num = parseFloat(est.state);
-        if (!isNaN(num) && num >= opts.warnIfAtOrAbove) {
-          mini.classList.add("warn");
-          mini.style.setProperty("--warn-color", warnColor);
-        }
-      }
-      const mIcon = document.createElement("ha-icon");
-      mIcon.icon = iconName;
-      mini.appendChild(mIcon);
-      if (opts.label) {
-        const labelSpan = document.createElement("span");
-        labelSpan.className = "node-mini-stat-label";
-        labelSpan.textContent = `${opts.label}:`;
-        mini.appendChild(labelSpan);
-      }
-      const valueSpan = document.createElement("span");
-      valueSpan.className = "node-mini-stat-value";
-      valueSpan.textContent = fmtState(est);
-      mini.appendChild(valueSpan);
-      mini.title = opts.title || (opts.label ? `${opts.label}: ${fmtState(est)}` : "");
-      wrap.appendChild(mini);
-    };
-    add(n.containers_entity, "mdi:package-variant-closed");
-    add(n.vms_entity, "mdi:monitor");
-    add(n.cpu_entity, "mdi:cpu-64-bit");
-    add(n.memory_entity, "mdi:memory");
-    add(n.storage_entity, "mdi:harddisk");
-    add(n.temperature_entity, "mdi:thermometer", { warnIfAtOrAbove: threshold });
+    this._addMiniStat(h, wrap, n.containers_entity, "mdi:package-variant-closed", threshold, warnColor);
+    this._addMiniStat(h, wrap, n.vms_entity, "mdi:monitor", threshold, warnColor);
+    this._addMiniStat(h, wrap, n.cpu_entity, "mdi:cpu-64-bit", threshold, warnColor);
+    this._addMiniStat(h, wrap, n.memory_entity, "mdi:memory", threshold, warnColor);
+    this._addMiniStat(h, wrap, n.storage_entity, "mdi:harddisk", threshold, warnColor);
+    this._addMiniStat(h, wrap, n.temperature_entity, "mdi:thermometer", threshold, warnColor, { warnIfAtOrAbove: threshold });
+    return wrap;
+  }
+
+  // Second line: per-disk temperatures, rendered below the general stats
+  // (next to the node's status text) so long disk labels get their own row
+  // instead of competing with the counts/load stats for space.
+  _renderNodeDriveStats(h, n, threshold, warnColor) {
+    const wrap = document.createElement("div");
+    wrap.className = "node-mini-stats";
     (n.drives || []).slice(0, MAX_DRIVES_PER_NODE).forEach((d, i) => {
       if (!d.entity) return;
       const label = trimStr(d.label) || `Disk ${i + 1}`;
-      add(d.entity, "mdi:thermometer", { warnIfAtOrAbove: threshold, label });
+      this._addMiniStat(h, wrap, d.entity, "mdi:thermometer", threshold, warnColor, { warnIfAtOrAbove: threshold, label });
     });
     return wrap;
   }
@@ -1720,8 +1732,15 @@ class HaInfraProxmox extends HTMLElement {
       text.appendChild(stateSpan);
       row.appendChild(text);
 
-      const miniStats = this._renderNodeMiniStats(h, n, tempThreshold, tempWarnColor);
-      if (miniStats.children.length) row.appendChild(miniStats);
+      const generalStats = this._renderNodeGeneralStats(h, n, tempThreshold, tempWarnColor);
+      const driveStats = this._renderNodeDriveStats(h, n, tempThreshold, tempWarnColor);
+      if (generalStats.children.length || driveStats.children.length) {
+        const statsCol = document.createElement("div");
+        statsCol.className = "node-stats-col";
+        if (generalStats.children.length) statsCol.appendChild(generalStats);
+        if (driveStats.children.length) statsCol.appendChild(driveStats);
+        row.appendChild(statsCol);
+      }
 
       attachGestures(row, h, { entity: n.status_entity, tap_action: n.tap_action, hold_action: n.hold_action });
       block.appendChild(row);
